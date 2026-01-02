@@ -99,6 +99,7 @@
 2. 添加以下变量（任选其一或全部添加）：
    - `BARK_URL`：Bark 推送地址（iOS推荐，如 `https://api.day.app/xxxxx`）
    - `PUSHPLUS_TOKEN`：PushPlus 令牌（微信推送推荐，去 [pushplus.plus](http://www.pushplus.plus/) 获取）
+   - `EXTERNAL_URL`：填入你的反代备案域名（例如 https://xx.xxx.com）-（可选，注意：带上https，末尾不要带斜杠)
    - `PHONE_NUMBER`：备用联系电话（可选）
 
 ### 第五步：绑定域名（可选）
