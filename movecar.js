@@ -118,8 +118,7 @@ async function handleNotify(request, url) {
 
     const confirmUrlEncoded = encodeURIComponent(confirmUrl);
 
-    let notifyBody = '🚗 挪车请求';
-    if (message) notifyBody += `\\n💬 留言: ${message}`;
+    let notifyBody = `💬 留言: ${message}`;
 
     if (location && location.lat && location.lng) {
       const urls = generateMapUrls(location.lat, location.lng);
@@ -510,6 +509,38 @@ function renderMainPage(origin) {
       }
       .modal-btn:active { transform: scale(0.96); }
       .modal-btn-primary { background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); color: white; }
+      .modal-btn-danger { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #ef4444; }
+      .countdown-container {
+        display: flex;
+        justify-content: center;
+        margin: 24px 0;
+        position: relative;
+      }
+      .flip-card {
+        background: #1a202c;
+        color: white;
+        font-size: clamp(60px, 15vw, 80px);
+        font-weight: 700;
+        line-height: 1;
+        padding: clamp(16px, 4vw, 24px) clamp(24px, 6vw, 32px);
+        border-radius: 12px;
+        min-width: 120px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        position: relative;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        letter-spacing: 2px;
+      }
+      .flip-card::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: rgba(0,0,0,0.4);
+        transform: translateY(-50%);
+      }
     </style>
   </head>
   <body>
@@ -521,6 +552,19 @@ function renderMainPage(origin) {
         <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将延迟30秒发送通知</div>
         <div class="modal-buttons">
           <button class="modal-btn modal-btn-primary" onclick="hideModal('locationTipModal');requestLocation()">我知道了</button>
+        </div>
+      </div>
+    </div>
+    <div id="delayModal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-icon">⏳</div>
+        <div class="modal-title">正在延迟发送</div>
+        <div class="modal-desc">未提供位置信息，<br>将在倒计时结束后发送通知</div>
+        <div class="countdown-container">
+          <div id="countdownNum" class="flip-card">30</div>
+        </div>
+        <div class="modal-buttons">
+          <button class="modal-btn modal-btn-danger" onclick="cancelDelay()">取消发送</button>
         </div>
       </div>
     </div>
@@ -539,6 +583,7 @@ function renderMainPage(origin) {
           <div class="tag" onclick="addTag('麻烦尽快')">🙏 加急</div>
         </div>
       </div>
+      <div style="position: fixed; bottom: 10px; right: 10px; opacity: 0.3; font-size: 12px; color: #333; pointer-events: none;">v1.0.2</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -587,6 +632,8 @@ function renderMainPage(origin) {
     <script>
       let userLocation = null;
       let checkTimer = null;
+      let delayTimer = null;
+      let countdownVal = 30;
       window.onload = () => {
         const toggle = document.getElementById('shareLocationToggle');
         toggle.addEventListener('change', handleLocationToggle);
@@ -658,12 +705,47 @@ function renderMainPage(origin) {
         }
         return res;
       }
-      async function sendNotify() {
-        const btn = document.getElementById('notifyBtn');
-        const msg = document.getElementById('msgInput').value;
+      function startDelayCountdown() {
+        showModal('delayModal');
+        countdownVal = 30;
+        updateDelayMsg();
+        delayTimer = setInterval(() => {
+          countdownVal--;
+          updateDelayMsg();
+          if (countdownVal <= 0) {
+             clearInterval(delayTimer);
+             hideModal('delayModal');
+             doSendNotify(null);
+          }
+        }, 1000);
+      }
+
+      function updateDelayMsg() {
+         const el = document.getElementById('countdownNum');
+         if(el) el.innerText = countdownVal.toString().padStart(2, '0');
+      }
+
+      function cancelDelay() {
+        clearInterval(delayTimer);
+        hideModal('delayModal');
+      }
+
+      function sendNotify() {
         const shareLocation = document.getElementById('shareLocationToggle').checked;
         const locationToSend = shareLocation ? userLocation : null;
-        const delayed = !locationToSend;
+        
+        if (locationToSend) {
+          doSendNotify(locationToSend);
+        } else {
+          startDelayCountdown();
+        }
+      }
+
+      async function doSendNotify(locationToSend) {
+        const btn = document.getElementById('notifyBtn');
+        const msg = document.getElementById('msgInput').value;
+        const delayed = false; // Client side delay already handled
+        
         btn.disabled = true;
         btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
         try {
@@ -680,7 +762,7 @@ function renderMainPage(origin) {
                 showToast('⚠️ MeoW 本地发送失败，请重试');
               });
             }
-            if (delayed) showToast('⏳ 通知将延迟30秒发送');
+            if (delayed) showToast('⏳ 通知将延迟30秒发送'); // Should basically never happen with forced false
             else showToast('✅ 发送成功！');
             document.getElementById('mainView').style.display = 'none';
             document.getElementById('successView').style.display = 'flex';
