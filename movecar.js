@@ -610,6 +610,40 @@ function renderMainPage(origin) {
         <span>一键通知车主</span>
       </button>
     </div>
+    <div class="container" id="successView" style="display: none; flex-direction: column; align-items: center; justify-content: start; padding-top: 40px;">
+      <div id="ownerFeedback" class="card owner-card hidden">
+        <span style="font-size:56px; display:block; margin-bottom:16px">🎉</span>
+        <h3>车主已收到通知</h3>
+        <p>正在赶来，点击查看车主位置</p>
+        <div id="ownerMapLinks" class="map-links" style="display:none">
+          <a id="ownerAmapLink" href="#" class="map-btn amap">🗺️ 高德地图</a>
+          <a id="ownerAppleLink" href="#" class="map-btn apple">🍎 Apple Maps</a>
+        </div>
+      </div>
+      
+      <div id="waitingCard" class="card" style="text-align: center; margin-bottom: 15px;">
+        <span style="font-size: 60px; display: block; margin-bottom: 20px;">✅</span>
+        <h1 style="color: #2d3748; margin-bottom: 10px;">已通知车主</h1>
+        <p id="waitingText" style="color: #718096; font-size: 16px;">正在等待车主回应...</p>
+      </div>
+
+      <div class="card action-card">
+        <p class="action-hint">车主没反应？试试其他方式</p>
+        <button id="retryBtn" class="btn-retry" onclick="retryNotify()">
+          <span>🔔</span>
+          <span>再次通知</span>
+        </button>
+        ${phone ? `
+        <a href="tel:${phone}" class="btn-phone">
+          <span>📞</span>
+          <span>直接打电话</span>
+        </a>
+        ` : ''}
+        <div style="margin-top: 15px; text-align: center;">
+           <a href="javascript:location.reload()" style="color: #a0aec0; text-decoration: none; font-size: 14px;">返回首页</a>
+        </div>
+      </div>
+    </div>
     <!-- Add Leaflet CSS and JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -735,7 +769,9 @@ function renderMainPage(origin) {
           map.setView(center, 16);
           marker.setLatLng(center);
         }
-        map.invalidateSize();
+        if (map) {
+          map.invalidateSize();
+        }
       }
 
       function hideMap() {
@@ -835,8 +871,10 @@ function renderMainPage(origin) {
             }
             if (delayed) showToast('⏳ 通知将延迟30秒发送'); // Should basically never happen with forced false
             else showToast('✅ 发送成功！');
-            document.getElementById('mainView').style.display = 'none';
-            document.getElementById('successView').style.display = 'flex';
+            const mainView = document.getElementById('mainView');
+            if (mainView) mainView.style.display = 'none';
+            const successView = document.getElementById('successView');
+            if (successView) successView.style.display = 'flex';
             startPolling();
           } else {
             // 显示后端返回的具体错误信息
@@ -861,9 +899,12 @@ function renderMainPage(origin) {
               const fb = document.getElementById('ownerFeedback');
               fb.classList.remove('hidden');
               if (data.ownerLocation && data.ownerLocation.amapUrl) {
-                document.getElementById('ownerMapLinks').style.display = 'flex';
-                document.getElementById('ownerAmapLink').href = data.ownerLocation.amapUrl;
-                document.getElementById('ownerAppleLink').href = data.ownerLocation.appleUrl;
+                const mapLinks = document.getElementById('ownerMapLinks');
+                if (mapLinks) mapLinks.style.display = 'flex';
+                const amapLink = document.getElementById('ownerAmapLink');
+                if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
+                const appleLink = document.getElementById('ownerAppleLink');
+                if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
               }
               clearInterval(checkTimer);
               if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -1073,9 +1114,12 @@ function renderOwnerPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ location: ownerLocation })
           });
-          btn.innerHTML = '<span>✅</span><span>已确认</span>';
-          btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
-          document.getElementById('doneMsg').classList.add('show');
+          if (btn) {
+              btn.innerHTML = '<span>✅</span><span>已确认</span>';
+              btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+          }
+          const doneMsg = document.getElementById('doneMsg');
+          if (doneMsg) doneMsg.classList.add('show');
         } catch(e) {
           btn.disabled = false;
           btn.innerHTML = '<span>🚀</span><span>我已知晓，正在前往</span>';
