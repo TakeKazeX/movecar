@@ -549,7 +549,7 @@ function renderMainPage(origin) {
       <div class="modal-box">
         <div class="modal-icon">📍</div>
         <div class="modal-title">位置信息说明</div>
-        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将延迟30秒发送通知</div>
+        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将延迟发送通知</div>
         <div class="modal-buttons">
           <button class="modal-btn modal-btn-primary" onclick="hideModal('locationTipModal');requestLocation()">我知道了</button>
         </div>
@@ -688,7 +688,7 @@ function renderMainPage(origin) {
         const txt = document.getElementById('locStatus');
         icon.className = 'loc-icon disabled';
         txt.className = 'loc-status disabled';
-        txt.innerText = '已关闭位置共享';
+        txt.innerText = '已关闭位置共享，将在延迟后发送挪车信息';
       }
       async function sendMeowLocal(request) {
         if (!request || !request.url) {
