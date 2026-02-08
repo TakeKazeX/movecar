@@ -907,6 +907,26 @@ function renderOwnerPage() {
       }
       .done-msg.show { display: block; }
       .done-msg p { color: #065f46; font-weight: 600; font-size: clamp(15px, 4vw, 17px); }
+      
+      /* Toggle Styles */
+      .loc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding: 0 10px; }
+      .loc-title { font-size: 16px; font-weight: 600; color: #2d3748; }
+      .toggle {
+        position: relative; display: inline-flex; align-items: center;
+        width: 52px; height: 30px; flex-shrink: 0;
+      }
+      .toggle input { opacity: 0; width: 0; height: 0; }
+      .toggle-slider {
+        position: absolute; cursor: pointer; inset: 0;
+        background: #cbd5f5; border-radius: 999px; transition: background 0.2s;
+      }
+      .toggle-slider::before {
+        content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
+        background: white; border-radius: 50%; transition: transform 0.2s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      }
+      .toggle input:checked + .toggle-slider { background: #38bdf8; }
+      .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
     </style>
   </head>
   <body>
@@ -921,6 +941,15 @@ function renderOwnerPage() {
           <a id="appleLink" href="#" class="map-btn apple">🍎 Apple Maps</a>
         </div>
       </div>
+      
+      <div class="loc-row">
+        <div class="loc-title">向对方发送我的位置</div>
+        <label class="toggle">
+          <input id="shareLocationToggle" type="checkbox" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <button id="confirmBtn" class="btn" onclick="confirmMove()">
         <span>🚀</span>
         <span>我已知晓，正在前往</span>
@@ -946,15 +975,23 @@ function renderOwnerPage() {
       }
       async function confirmMove() {
         const btn = document.getElementById('confirmBtn');
+        const shareLocation = document.getElementById('shareLocationToggle').checked;
+        
         btn.disabled = true;
-        btn.innerHTML = '<span>📍</span><span>获取位置中...</span>';
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => { ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; await doConfirm(); },
-            async (err) => { ownerLocation = null; await doConfirm(); },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-        } else { ownerLocation = null; await doConfirm(); }
+        
+        if (shareLocation) {
+             btn.innerHTML = '<span>📍</span><span>获取位置中...</span>';
+             if ('geolocation' in navigator) {
+               navigator.geolocation.getCurrentPosition(
+                 async (pos) => { ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; await doConfirm(); },
+                 async (err) => { ownerLocation = null; await doConfirm(); },
+                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+               );
+             } else { ownerLocation = null; await doConfirm(); }
+        } else {
+            ownerLocation = null;
+            await doConfirm();
+        }
       }
       async function doConfirm() {
         const btn = document.getElementById('confirmBtn');
