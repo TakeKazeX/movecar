@@ -318,10 +318,29 @@ function renderMainPage(origin) {
       .loc-icon.success { background: #d4edda; }
       .loc-icon.error { background: #f8d7da; }
       .loc-content { flex: 1; min-width: 0; }
+      .loc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
       .loc-title { font-size: clamp(15px, 4vw, 18px); font-weight: 600; color: #2d3748; }
       .loc-status { font-size: clamp(12px, 3.2vw, 14px); color: #718096; margin-top: 3px; }
       .loc-status.success { color: #28a745; }
       .loc-status.error { color: #dc3545; }
+      .loc-status.disabled { color: #94a3b8; }
+      .loc-icon.disabled { background: #e2e8f0; }
+      .toggle {
+        position: relative; display: inline-flex; align-items: center;
+        width: 52px; height: 30px; flex-shrink: 0;
+      }
+      .toggle input { opacity: 0; width: 0; height: 0; }
+      .toggle-slider {
+        position: absolute; cursor: pointer; inset: 0;
+        background: #cbd5f5; border-radius: 999px; transition: background 0.2s;
+      }
+      .toggle-slider::before {
+        content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
+        background: white; border-radius: 50%; transition: transform 0.2s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      }
+      .toggle input:checked + .toggle-slider { background: #38bdf8; }
+      .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
       .btn-main {
         background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); color: white; border: none;
         padding: clamp(16px, 4vw, 22px); border-radius: clamp(16px, 4vw, 22px);
@@ -423,7 +442,13 @@ function renderMainPage(origin) {
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
-          <div class="loc-title">我的位置</div>
+          <div class="loc-row">
+            <div class="loc-title">是否发送位置</div>
+            <label class="toggle">
+              <input id="shareLocationToggle" type="checkbox" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
           <div id="locStatus" class="loc-status">等待获取...</div>
         </div>
       </div>
@@ -462,10 +487,20 @@ function renderMainPage(origin) {
     <script>
       let userLocation = null;
       let checkTimer = null;
-      window.onload = () => { showModal('locationTipModal'); };
+      window.onload = () => {
+        const toggle = document.getElementById('shareLocationToggle');
+        toggle.addEventListener('change', handleLocationToggle);
+        if (toggle.checked) {
+          showModal('locationTipModal');
+        } else {
+          disableLocationSharing();
+        }
+      };
       function showModal(id) { document.getElementById(id).classList.add('show'); }
       function hideModal(id) { document.getElementById(id).classList.remove('show'); }
       function requestLocation() {
+        const toggle = document.getElementById('shareLocationToggle');
+        if (!toggle.checked) return;
         const icon = document.getElementById('locIcon');
         const txt = document.getElementById('locStatus');
         icon.className = 'loc-icon loading';
@@ -493,17 +528,34 @@ function renderMainPage(origin) {
         }
       }
       function addTag(text) { document.getElementById('msgInput').value = text; }
+      function handleLocationToggle(event) {
+        if (event.target.checked) {
+          showModal('locationTipModal');
+        } else {
+          disableLocationSharing();
+        }
+      }
+      function disableLocationSharing() {
+        userLocation = null;
+        const icon = document.getElementById('locIcon');
+        const txt = document.getElementById('locStatus');
+        icon.className = 'loc-icon disabled';
+        txt.className = 'loc-status disabled';
+        txt.innerText = '已关闭位置共享';
+      }
       async function sendNotify() {
         const btn = document.getElementById('notifyBtn');
         const msg = document.getElementById('msgInput').value;
-        const delayed = !userLocation;
+        const shareLocation = document.getElementById('shareLocationToggle').checked;
+        const locationToSend = shareLocation ? userLocation : null;
+        const delayed = !locationToSend;
         btn.disabled = true;
         btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
         try {
           const res = await fetch('/api/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: msg, location: userLocation, delayed: delayed })
+            body: JSON.stringify({ message: msg, location: locationToSend, delayed: delayed })
           });
           const data = await res.json();
           if (res.ok && data.success) {
