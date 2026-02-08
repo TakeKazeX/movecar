@@ -4,6 +4,12 @@ addEventListener('fetch', event => {
 
 const CONFIG = { KV_TTL: 3600 }
 
+function isTruthyEnv(val) {
+  if (val === undefined || val === null) return false;
+  const v = String(val).trim().toLowerCase();
+  return v !== '' && v !== 'false' && v !== '0' && v !== 'no';
+}
+
 async function handleRequest(request) {
   const url = new URL(request.url)
   const path = url.pathname
@@ -23,7 +29,7 @@ async function handleRequest(request) {
   if (path === '/api/check-status') {
     // 检查 KV 是否绑定，防止直接报错
     if (typeof MOVE_CAR_STATUS === 'undefined') {
-       return new Response(JSON.stringify({ status: 'error', error: 'KV_NOT_BOUND' }), { headers: { 'Content-Type': 'application/json' }});
+      return new Response(JSON.stringify({ status: 'error', error: 'KV_NOT_BOUND' }), { headers: { 'Content-Type': 'application/json' } });
     }
     const status = await MOVE_CAR_STATUS.get('notify_status');
     const ownerLocation = await MOVE_CAR_STATUS.get('owner_location');
@@ -100,13 +106,13 @@ async function handleNotify(request, url) {
     const message = body.message || '车旁有人等待';
     const location = body.location || null;
     const delayed = body.delayed || false;
-// --- 修改前 ---
-//  const confirmUrl = url.origin + '/owner-confirm';
+    // --- 修改前 ---
+    //  const confirmUrl = url.origin + '/owner-confirm';
 
-// --- 修改后：优先读取环境变量中的域名，如果没有配置则回退到原始域名 ---
-    const baseDomain = (typeof EXTERNAL_URL !== 'undefined' && EXTERNAL_URL) 
-                       ? EXTERNAL_URL.replace(/\/$/, "") // 去掉末尾斜杠
-                       : url.origin;
+    // --- 修改后：优先读取环境变量中的域名，如果没有配置则回退到原始域名 ---
+    const baseDomain = (typeof EXTERNAL_URL !== 'undefined' && EXTERNAL_URL)
+      ? EXTERNAL_URL.replace(/\/$/, "") // 去掉末尾斜杠
+      : url.origin;
 
     const confirmUrl = baseDomain + '/owner-confirm';
 
@@ -135,18 +141,31 @@ async function handleNotify(request, url) {
     }
 
     const notificationTasks = [];
+    let localMeowRequest = null;
+    const ensureNotifyOk = async (responsePromise, serviceName) => {
+      try {
+        const response = await responsePromise;
+        const text = await response.text(); // Always read response
+        if (!response.ok) {
+          throw new Error(`${serviceName} failed (${response.status}): ${text}`);
+        }
+        return { service: serviceName, status: response.status, body: text };
+      } catch (e) {
+        throw new Error(`${serviceName} error: ${e.message}`);
+      }
+    };
 
     // 检测 Bark 变量
     if (typeof BARK_URL !== 'undefined' && BARK_URL) {
       const barkApiUrl = `${BARK_URL}/挪车请求/${encodeURIComponent(notifyBody)}?group=MoveCar&level=critical&call=1&sound=minuet&icon=https://cdn-icons-png.flaticon.com/512/741/741407.png&url=${confirmUrlEncoded}`;
-      notificationTasks.push(fetch(barkApiUrl));
+      notificationTasks.push(ensureNotifyOk(fetch(barkApiUrl), 'Bark'));
     }
 
     // 检测 PushPlus 变量
     if (typeof PUSHPLUS_TOKEN !== 'undefined' && PUSHPLUS_TOKEN) {
       const pushPlusContent = notifyBody.replace(/\\n/g, '<br>') + `<br><br><a href="${confirmUrl}">👉 点击此处处理挪车请求</a>`;
       notificationTasks.push(
-        fetch('http://www.pushplus.plus/send', {
+        ensureNotifyOk(fetch('http://www.pushplus.plus/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -156,24 +175,105 @@ async function handleNotify(request, url) {
             template: 'html',
             channel: 'wechat'
           })
-        })
+        }), 'PushPlus')
       );
     }
 
-    // 如果两个都没配置，抛出错误
-    if (notificationTasks.length === 0) {
-      throw new Error('未配置通知方式！请在后台设置 BARK_URL 或 PUSHPLUS_TOKEN 变量');
+    // 检测 MeoW 变量
+    if (typeof MEOW_NICKNAME !== 'undefined' && MEOW_NICKNAME) {
+      const meowBaseUrl = (typeof MEOW_BASE_URL !== 'undefined' && MEOW_BASE_URL)
+        ? MEOW_BASE_URL.replace(/\/$/, '')
+        : 'https://api.chuckfang.com';
+      const meowMsgType = (typeof MEOW_MSG_TYPE !== 'undefined' && MEOW_MSG_TYPE)
+        ? MEOW_MSG_TYPE
+        : 'text'; // 修改默认值为 text，避免推送显示 html 标签
+      const meowLocalSend = isTruthyEnv(typeof MEOW_LOCAL_SEND !== 'undefined' ? MEOW_LOCAL_SEND : null);
+      const meowHtmlHeight = (typeof MEOW_HTML_HEIGHT !== 'undefined' && MEOW_HTML_HEIGHT)
+        ? Number(MEOW_HTML_HEIGHT)
+        : 260; // 适当增加默认高度以适应新样式
+      const meowUrl = new URL(`${meowBaseUrl}/${encodeURIComponent(MEOW_NICKNAME)}`);
+      meowUrl.searchParams.set('msgType', meowMsgType);
+
+      let meowContent = '';
+      if (meowMsgType === 'html') {
+        meowUrl.searchParams.set('htmlHeight', String(meowHtmlHeight));
+        // 构建完整的 HTML 页面结构
+        const htmlBody = notifyBody.replace(/\\n/g, '<br>');
+        meowContent = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 16px; margin: 0; line-height: 1.5; color: #333; }
+  a { color: #007bff; text-decoration: none; display: inline-block; margin-top: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+  ${htmlBody}
+  <br><br>
+  <a href="${confirmUrl}">👉 点击此处处理挪车请求</a>
+</body>
+</html>`;
+      } else {
+        // text 模式: 将 literal \n 替换为 实际换行符
+        const textBody = notifyBody.replace(/\\n/g, '\n');
+        meowContent = `${textBody}\n\n👉 点击此处处理挪车请求: ${confirmUrl}`;
+      }
+
+      const meowRequest = {
+        url: meowUrl.toString(),
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: {
+          title: '🚗 挪车请求',
+          msg: meowContent,
+          url: confirmUrl // 某些客户端可能优先读取 body 中的 url
+        }
+      };
+
+      if (meowLocalSend) {
+        localMeowRequest = meowRequest;
+      } else {
+        notificationTasks.push(
+          ensureNotifyOk(fetch(meowRequest.url, {
+            method: 'POST',
+            headers: meowRequest.headers,
+            body: JSON.stringify(meowRequest.body)
+          }), 'MeoW')
+        );
+      }
     }
 
-    await Promise.all(notificationTasks);
+    // 如果两个都没配置，抛出错误
+    if (notificationTasks.length === 0 && !localMeowRequest) {
+      throw new Error('未配置通知方式！请在后台设置 BARK_URL、PUSHPLUS_TOKEN 或 MEOW_NICKNAME 变量');
+    }
 
-    return new Response(JSON.stringify({ success: true }), {
+    const results = notificationTasks.length ? await Promise.all(notificationTasks) : [];
+    if (localMeowRequest) {
+      results.push({ service: 'MeoW(local)', status: 0, body: 'CLIENT_SEND' });
+    }
+    console.log('Notification tasks finished:', results);
+
+    const responsePayload = {
+      success: true,
+      serviceCount: results.length,
+      details: results
+    };
+    if (localMeowRequest) responsePayload.localMeowRequest = localMeowRequest;
+
+    return new Response(JSON.stringify(responsePayload), {
       headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     // 返回具体错误信息给前端，方便调试
-    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500 });
+    console.error('Notify Error:', error);
+    return new Response(JSON.stringify({ success: false, error: error.message, stack: error.stack }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 
@@ -209,7 +309,7 @@ async function handleOwnerConfirmAction(request) {
   } catch (error) {
     // 即使出错也尝试设为确认，避免卡死
     if (typeof MOVE_CAR_STATUS !== 'undefined') {
-       await MOVE_CAR_STATUS.put('notify_status', 'confirmed', { expirationTtl: 600 });
+      await MOVE_CAR_STATUS.put('notify_status', 'confirmed', { expirationTtl: 600 });
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -493,6 +593,34 @@ function renderMainPage(origin) {
         }
       }
       function addTag(text) { document.getElementById('msgInput').value = text; }
+      async function sendMeowLocal(localReq) {
+        if (!localReq || !localReq.url) return;
+        try {
+          const res = await fetch(localReq.url, {
+            method: 'POST',
+            headers: localReq.headers || { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(localReq.body || {})
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error('MeoW 本地发送失败 (' + res.status + ')' + (text ? ': ' + text : ''));
+          }
+          return true;
+        } catch (err) {
+          // 某些浏览器因 CORS 拦截无法读响应，这里尝试 no-cors 兜底
+          try {
+            await fetch(localReq.url, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+              body: JSON.stringify(localReq.body || {})
+            });
+            return true;
+          } catch (e) {
+            throw err;
+          }
+        }
+      }
       async function sendNotify() {
         const btn = document.getElementById('notifyBtn');
         const msg = document.getElementById('msgInput').value;
@@ -507,6 +635,12 @@ function renderMainPage(origin) {
           });
           const data = await res.json();
           if (res.ok && data.success) {
+            if (data.localMeowRequest) {
+              sendMeowLocal(data.localMeowRequest).catch((err) => {
+                console.error(err);
+                showToast('⚠️ MeoW 本地发送失败，请重试');
+              });
+            }
             if (delayed) showToast('⏳ 通知将延迟30秒发送');
             else showToast('✅ 发送成功！');
             document.getElementById('mainView').style.display = 'none';
@@ -561,7 +695,14 @@ function renderMainPage(origin) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: '再次通知：请尽快挪车', location: userLocation })
           });
-          if (res.ok) {
+          const data = await res.json();
+          if (res.ok && data.success) {
+            if (data.localMeowRequest) {
+              sendMeowLocal(data.localMeowRequest).catch((err) => {
+                console.error(err);
+                showToast('⚠️ MeoW 本地发送失败，请重试');
+              });
+            }
             showToast('✅ 再次通知已发送！');
             document.getElementById('waitingText').innerText = '已再次通知，等待车主回应...';
           } else { throw new Error('API Error'); }
