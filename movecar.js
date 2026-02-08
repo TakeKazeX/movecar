@@ -700,6 +700,7 @@ function renderMainPage(origin) {
       
       function showMap(lat, lng) {
         const container = document.getElementById('mapContainer');
+        if (!container) return; // Prevention
         container.style.display = 'block';
         
         // Convert WGS84 (GPS) to GCJ02 (Amap/Chinese standard)
@@ -738,7 +739,8 @@ function renderMainPage(origin) {
       }
 
       function hideMap() {
-        document.getElementById('mapContainer').style.display = 'none';
+        const container = document.getElementById('mapContainer');
+        if (container) container.style.display = 'none';
       }
 
       function addTag(text) { document.getElementById('msgInput').value = text; }
