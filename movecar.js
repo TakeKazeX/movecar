@@ -654,7 +654,7 @@ function renderMainPage(origin) {
         });
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`MeoW 本地发送失败 (${res.status}): ${text}`);
+          throw new Error('MeoW 本地发送失败 (' + res.status + '): ' + text + ' ');
         }
         return res;
       }
