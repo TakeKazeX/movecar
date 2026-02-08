@@ -370,18 +370,23 @@ function renderMainPage(origin) {
         transition: transform 0.2s ease;
       }
       .card:active { transform: scale(0.98); }
-      .header { text-align: center; padding: clamp(20px, 5vw, 32px) clamp(16px, 4vw, 28px); background: white; }
-      .icon-wrap {
-        width: clamp(72px, 18vw, 100px); height: clamp(72px, 18vw, 100px);
-        background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
-        border-radius: clamp(22px, 5vw, 32px);
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto clamp(14px, 3vw, 24px);
-        box-shadow: 0 12px 32px rgba(0, 147, 233, 0.35);
+      .header {
+        text-align: left; padding: clamp(20px, 5vw, 32px) clamp(16px, 4vw, 28px); background: white;
+        display: flex; align-items: center; gap: clamp(16px, 4vw, 24px);
       }
-      .icon-wrap span { font-size: clamp(36px, 9vw, 52px); }
-      .header h1 { font-size: clamp(22px, 5.5vw, 30px); font-weight: 700; color: #1a202c; margin-bottom: 6px; }
-      .header p { font-size: clamp(13px, 3.5vw, 16px); color: #718096; font-weight: 500; }
+      .icon-wrap {
+        width: clamp(60px, 15vw, 84px); height: clamp(60px, 15vw, 84px);
+        background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
+        border-radius: clamp(18px, 4vw, 26px);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0;
+        box-shadow: 0 12px 32px rgba(0, 147, 233, 0.35);
+        flex-shrink: 0;
+      }
+      .icon-wrap span { font-size: clamp(32px, 8vw, 44px); }
+      .header-content { flex: 1; }
+      .header h1 { font-size: clamp(20px, 5vw, 26px); font-weight: 700; color: #1a202c; margin-bottom: 4px; line-height: 1.2; }
+      .header p { font-size: clamp(13px, 3.5vw, 15px); color: #718096; font-weight: 500; }
       .input-card { padding: 0; overflow: hidden; }
       .input-card textarea {
         width: 100%; min-height: clamp(90px, 20vw, 120px); border: none;
@@ -549,9 +554,9 @@ function renderMainPage(origin) {
       <div class="modal-box">
         <div class="modal-icon">📍</div>
         <div class="modal-title">位置信息说明</div>
-        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将延迟发送通知</div>
+        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将 <span style="font-weight:bold; font-size:1.2em;"> 延迟 </span> 发送通知</div>
         <div class="modal-buttons">
-          <button class="modal-btn modal-btn-primary" onclick="hideModal('locationTipModal');requestLocation()">我知道了</button>
+          <button class="modal-btn modal-btn-primary" onclick="hideModal('locationTipModal');">我知道了</button>
         </div>
       </div>
     </div>
@@ -571,8 +576,10 @@ function renderMainPage(origin) {
     <div class="container" id="mainView">
       <div class="card header">
         <div class="icon-wrap"><span>🚗</span></div>
-        <h1>呼叫车主挪车</h1>
-        <p>Notify Car Owner</p>
+        <div class="header-content">
+          <h1>呼叫车主挪车</h1>
+          <p>Notify Car Owner</p>
+        </div>
       </div>
       <div class="card input-card">
         <textarea id="msgInput" placeholder="输入留言给车主...（可选）"></textarea>
@@ -583,7 +590,7 @@ function renderMainPage(origin) {
           <div class="tag" onclick="addTag('麻烦尽快')">🙏 加急</div>
         </div>
       </div>
-      <div style="position: fixed; bottom: 10px; right: 10px; opacity: 0.3; font-size: 12px; color: #333; pointer-events: none;">v1.0.2</div>
+      <div style="position: fixed; bottom: 10px; right: 10px; opacity: 0.3; font-size: 12px; color: #333; pointer-events: none;">v1.0.3</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -597,48 +604,61 @@ function renderMainPage(origin) {
           <div id="locStatus" class="loc-status">等待获取...</div>
         </div>
       </div>
+      <div id="mapContainer" class="card" style="display:none; height: 200px; padding: 0; overflow: hidden; margin-top: -10px;"></div>
       <button id="notifyBtn" class="card btn-main" onclick="sendNotify()">
         <span>🔔</span>
         <span>一键通知车主</span>
       </button>
     </div>
-    <div class="container" id="successView">
-      <div class="card success-card">
-        <span class="success-icon">✅</span>
-        <h2>通知已发送！</h2>
-        <p id="waitingText" class="loading-text">正在等待车主回应...</p>
-      </div>
-      <div id="ownerFeedback" class="card owner-card hidden">
-        <span style="font-size:56px; display:block; margin-bottom:16px">🎉</span>
-        <h3>车主已收到通知</h3>
-        <p>正在赶来，点击查看车主位置</p>
-        <div id="ownerMapLinks" class="map-links" style="display:none">
-          <a id="ownerAmapLink" href="#" class="map-btn amap">🗺️ 高德地图</a>
-          <a id="ownerAppleLink" href="#" class="map-btn apple">🍎 Apple Maps</a>
-        </div>
-      </div>
-      <div class="card action-card">
-        <p class="action-hint">车主没反应？试试其他方式</p>
-        <button id="retryBtn" class="btn-retry" onclick="retryNotify()">
-          <span>🔔</span>
-          <span>再次通知</span>
-        </button>
-        <a href="tel:${phone}" class="btn-phone">
-          <span>📞</span>
-          <span>直接打电话</span>
-        </a>
-      </div>
-    </div>
+    <!-- Add Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
       let userLocation = null;
       let checkTimer = null;
       let delayTimer = null;
       let countdownVal = 30;
+      let map = null;
+      let marker = null;
+
+      // WGS-84 to GCJ-02 function used in client side for map display
+      function wgs84ToGcj02Client(lat, lng) {
+        const a = 6378245.0;
+        const ee = 0.00669342162296594323;
+        if (outOfChina(lat, lng)) return { lat, lng };
+        let dLat = transformLat(lng - 105.0, lat - 35.0);
+        let dLng = transformLng(lng - 105.0, lat - 35.0);
+        const radLat = lat / 180.0 * Math.PI;
+        let magic = Math.sin(radLat);
+        magic = 1 - ee * magic * magic;
+        const sqrtMagic = Math.sqrt(magic);
+        dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+        return { lat: lat + dLat, lng: lng + dLng };
+      }
+      function outOfChina(lat, lng) {
+        return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+      }
+      function transformLat(x, y) {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+        return ret;
+      }
+      function transformLng(x, y) {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+        return ret;
+      }
+
       window.onload = () => {
         const toggle = document.getElementById('shareLocationToggle');
         toggle.addEventListener('change', handleLocationToggle);
         if (toggle.checked) {
-          showModal('locationTipModal');
+          requestLocation();
         } else {
           disableLocationSharing();
         }
@@ -660,11 +680,13 @@ function renderMainPage(origin) {
               icon.className = 'loc-icon success';
               txt.className = 'loc-status success';
               txt.innerText = '已获取位置 ✓';
+              showMap(userLocation.lat, userLocation.lng);
             },
             (err) => {
               icon.className = 'loc-icon error';
               txt.className = 'loc-status error';
               txt.innerText = '位置获取失败，刷新页面可重试';
+              hideMap();
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
           );
@@ -672,14 +694,60 @@ function renderMainPage(origin) {
           icon.className = 'loc-icon error';
           txt.className = 'loc-status error';
           txt.innerText = '浏览器不支持定位';
+          hideMap();
         }
       }
+      
+      function showMap(lat, lng) {
+        const container = document.getElementById('mapContainer');
+        container.style.display = 'block';
+        
+        // Convert WGS84 (GPS) to GCJ02 (Amap/Chinese standard)
+        const gcj = wgs84ToGcj02Client(lat, lng);
+        const center = [gcj.lat, gcj.lng];
+
+        if (!map) {
+          map = L.map('mapContainer', {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: false,
+            touchZoom: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false
+          }).setView(center, 16);
+          
+          L.tileLayer('http://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            minZoom: 1,
+            maxZoom: 19
+          }).addTo(map);
+          
+          const icon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="font-size: 30px;">📍</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+          marker = L.marker(center, {icon: icon}).addTo(map);
+        } else {
+          map.setView(center, 16);
+          marker.setLatLng(center);
+        }
+        map.invalidateSize();
+      }
+
+      function hideMap() {
+        document.getElementById('mapContainer').style.display = 'none';
+      }
+
       function addTag(text) { document.getElementById('msgInput').value = text; }
       function handleLocationToggle(event) {
         if (event.target.checked) {
-          showModal('locationTipModal');
+          requestLocation();
         } else {
           disableLocationSharing();
+          showModal('locationTipModal');
         }
       }
       function disableLocationSharing() {
@@ -689,6 +757,7 @@ function renderMainPage(origin) {
         icon.className = 'loc-icon disabled';
         txt.className = 'loc-status disabled';
         txt.innerText = '已关闭位置共享，将在延迟后发送挪车信息';
+        hideMap();
       }
       async function sendMeowLocal(request) {
         if (!request || !request.url) {
