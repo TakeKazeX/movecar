@@ -643,6 +643,21 @@ function renderMainPage(origin) {
         txt.className = 'loc-status disabled';
         txt.innerText = '已关闭位置共享';
       }
+      async function sendMeowLocal(request) {
+        if (!request || !request.url) {
+          throw new Error('MeoW 本地请求缺少目标地址');
+        }
+        const res = await fetch(request.url, {
+          method: 'POST',
+          headers: request.headers || { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(request.body || {})
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`MeoW 本地发送失败 (${res.status}): ${text}`);
+        }
+        return res;
+      }
       async function sendNotify() {
         const btn = document.getElementById('notifyBtn');
         const msg = document.getElementById('msgInput').value;
