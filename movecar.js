@@ -26,6 +26,10 @@ async function handleRequest(request) {
     return handleOwnerConfirmAction(request);
   }
 
+  if (path === '/api/get-phone' && request.method === 'POST') {
+    return handleGetPhone();
+  }
+
   if (path === '/api/check-status') {
     // 检查 KV 是否绑定，防止直接报错
     if (typeof MOVE_CAR_STATUS === 'undefined') {
@@ -285,6 +289,19 @@ async function handleGetLocation() {
   return new Response(JSON.stringify({ error: 'No location' }), { status: 404 });
 }
 
+function handleGetPhone() {
+  const phone = typeof PHONE_NUMBER !== 'undefined' ? PHONE_NUMBER : '';
+  if (!phone) {
+    return new Response(JSON.stringify({ success: false, error: 'NO_PHONE' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  return new Response(JSON.stringify({ success: true, phone: phone }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
 async function handleOwnerConfirmAction(request) {
   try {
     if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
@@ -433,6 +450,8 @@ function renderMainPage(origin) {
       box-sizing: border-box;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     body {
@@ -966,6 +985,7 @@ function renderMainPage(origin) {
     }
 
     .btn-retry:disabled,
+    .btn-phone:disabled,
     .btn-phone.disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -1365,7 +1385,7 @@ function renderMainPage(origin) {
       <div id="waitingCard" class="card" style="text-align: center; margin-bottom: 15px;">
         <span style="font-size: 60px; display: block; margin-bottom: 20px;">✅</span>
         <h1 style="color: var(--text-primary); margin-bottom: 10px;">已通知车主</h1>
-        <p id="waitingText" style="color: var(--text-secondary); font-size: 16px;">正在等待车主回应...</p>
+        <p id="waitingText" style="color: var(--text-secondary); font-size: 16px;">正在等待车主回应...请不要离开此页面</p>
       </div>
 
       <div class="card action-card">
@@ -1375,10 +1395,10 @@ function renderMainPage(origin) {
           <span>再次通知</span>
         </button>
         ${phone ? `
-        <a id="phoneBtn" href="tel:${phone}" class="btn-phone spot-btn">
+        <button id="phoneBtn" type="button" class="btn-phone spot-btn">
           <span>📞</span>
           <span>直接打电话</span>
-        </a>
+        </button>
         ` : ''}
 <div style="margin-top: 15px; text-align: center;">
           <a href="javascript:location.reload()"
@@ -1401,8 +1421,9 @@ let userLocation = null;
       let retryReadyAt = 0;
       let phoneReadyAt = null;
       let phoneDefaultHtml = '';
-      const RETRY_COOLDOWN_SECONDS = 30;
-      const CALL_COOLDOWN_SECONDS = 30;
+      let retryCooldownSeconds = 30;
+      let callCooldownSeconds = 30;
+      let ownerConfirmed = false;
       let countdownVal = 30;
       let lastCountdownVal = null;
       let map = null;
@@ -1459,8 +1480,15 @@ let userLocation = null;
           phoneBtn.addEventListener('click', (e) => {
             if (!isPhoneReady()) {
               e.preventDefault();
-              showToast('⏳ 再次提醒后等待30秒再拨打电话');
+              if (phoneReadyAt === null) {
+                showToast('⏳ 请先再次提醒后再拨打电话');
+              } else {
+                const remaining = Math.max(0, Math.ceil((phoneReadyAt - Date.now()) / 1000));
+                showToast('⏳ 还需等待 ' + remaining + 's 再拨打电话');
+              }
+              return;
             }
+            requestPhoneAndCall();
           });
         }
       }
@@ -1510,6 +1538,7 @@ let userLocation = null;
         const phoneBtn = document.getElementById('phoneBtn');
         if (!phoneBtn) return;
         phoneReadyAt = null;
+        phoneBtn.disabled = true;
         phoneBtn.classList.add('disabled');
         phoneBtn.innerHTML = '<span>📞</span><span>再次提醒后可拨打</span>';
       }
@@ -1518,6 +1547,7 @@ let userLocation = null;
         if (!phoneBtn) return;
         if (phoneCooldownTimer) clearInterval(phoneCooldownTimer);
         phoneReadyAt = Date.now() + seconds * 1000;
+        phoneBtn.disabled = true;
         phoneBtn.classList.add('disabled');
         updatePhoneCountdown();
         phoneCooldownTimer = setInterval(updatePhoneCountdown, 1000);
@@ -1530,6 +1560,7 @@ let userLocation = null;
           clearInterval(phoneCooldownTimer);
           phoneCooldownTimer = null;
           phoneBtn.classList.remove('disabled');
+          phoneBtn.disabled = false;
           phoneBtn.innerHTML = phoneDefaultHtml || '<span>📞</span><span>直接打电话</span>';
           phoneReadyAt = Date.now();
           updateActionHint();
@@ -1541,6 +1572,19 @@ let userLocation = null;
       function isPhoneReady() {
         if (phoneReadyAt === null) return false;
         return Date.now() >= phoneReadyAt;
+      }
+      async function requestPhoneAndCall() {
+        try {
+          const res = await fetch('/api/get-phone', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.phone) {
+            throw new Error(data.error || 'NO_PHONE');
+          }
+          window.location.href = 'tel:' + data.phone;
+        } catch (e) {
+          console.error(e);
+          showToast('❌ 获取电话失败');
+        }
       }
       function showModal(id) { document.getElementById(id).classList.add('show'); }
       function hideModal(id) { document.getElementById(id).classList.remove('show'); }
@@ -1697,11 +1741,9 @@ let userLocation = null;
          topAnim.textContent = prev;
          bottomAnim.textContent = current;
 
-         if (prev !== current) {
-           el.classList.remove('flip');
-           void el.offsetWidth;
-           el.classList.add('flip');
-         }
+         el.classList.remove('flip');
+         void el.offsetWidth;
+         el.classList.add('flip');
          lastCountdownVal = countdownVal;
       }
 
@@ -1748,7 +1790,7 @@ let userLocation = null;
             if (mainView) mainView.style.display = 'none';
             const successView = document.getElementById('successView');
             if (successView) successView.style.display = 'flex';
-            startRetryCooldown(RETRY_COOLDOWN_SECONDS);
+            startRetryCooldown(retryCooldownSeconds);
             disablePhoneUntilRetry();
             updateActionHint();
             startPolling();
@@ -1763,6 +1805,8 @@ let userLocation = null;
           btn.innerHTML = '<span>🔔</span><span>一键通知车主</span>';
         }
       }
+      document.addEventListener('contextmenu', (e) => e.preventDefault());
+
       function startPolling() {
         let count = 0;
         checkTimer = setInterval(async () => {
@@ -1774,6 +1818,8 @@ let userLocation = null;
             if (data.status === 'confirmed') {
               const fb = document.getElementById('ownerFeedback');
               fb.classList.remove('hidden');
+              const waitingCard = document.getElementById('waitingCard');
+              if (waitingCard) waitingCard.style.display = 'none';
               if (data.ownerLocation && data.ownerLocation.amapUrl) {
                 const mapLinks = document.getElementById('ownerMapLinks');
                 if (mapLinks) mapLinks.style.display = 'flex';
@@ -1781,6 +1827,14 @@ let userLocation = null;
                 if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
                 const appleLink = document.getElementById('ownerAppleLink');
                 if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
+              }
+              if (!ownerConfirmed) {
+                ownerConfirmed = true;
+                retryCooldownSeconds = 60;
+                callCooldownSeconds = 180;
+                startRetryCooldown(retryCooldownSeconds);
+                disablePhoneUntilRetry();
+                updateActionHint();
               }
               clearInterval(checkTimer);
               if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -1819,8 +1873,8 @@ let userLocation = null;
             }
             showToast('✅ 再次通知已发送！');
             document.getElementById('waitingText').innerText = '已再次通知，等待车主回应...';
-            startRetryCooldown(RETRY_COOLDOWN_SECONDS);
-            startPhoneCooldown(CALL_COOLDOWN_SECONDS);
+            startRetryCooldown(retryCooldownSeconds);
+            startPhoneCooldown(callCooldownSeconds);
             success = true;
           } else { throw new Error('API Error'); }
         } catch (e) { showToast('❌ 发送失败，请重试'); }
@@ -1842,6 +1896,7 @@ let userLocation = null;
       let sourceIntensity = 0;
       let targetSourceIntensity = 0;
       let rafId = 0;
+      let pointerRaf = 0;
 
       const resetSpot = (btn) => {
         btn.style.setProperty('--bx', '-1000px');
@@ -1904,6 +1959,16 @@ let userLocation = null;
         });
       };
 
+      const scheduleUpdate = () => {
+        if (pointerRaf) return;
+        pointerRaf = requestAnimationFrame(() => {
+          pointerRaf = 0;
+          if (lastX > -9999) {
+            updateAll(lastX, lastY);
+          }
+        });
+      };
+
       const tick = () => {
         sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
         if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
@@ -1921,6 +1986,10 @@ let userLocation = null;
 
       const resetAll = () => {
         buttons.forEach(resetSpot);
+        if (pointerRaf) {
+          cancelAnimationFrame(pointerRaf);
+          pointerRaf = 0;
+        }
         sourceIntensity = 0;
         targetSourceIntensity = 0;
         sourceX = -10000;
@@ -1932,7 +2001,7 @@ let userLocation = null;
       document.addEventListener('pointermove', (e) => {
         lastX = e.clientX;
         lastY = e.clientY;
-        updateAll(lastX, lastY);
+        scheduleUpdate();
       });
 
       document.addEventListener('pointerout', (e) => {
@@ -1945,7 +2014,7 @@ let userLocation = null;
 
       window.addEventListener('blur', resetAll);
       window.addEventListener('resize', () => {
-        if (lastX > -9999) updateAll(lastX, lastY);
+        if (lastX > -9999) scheduleUpdate();
       });
 
       buttons.forEach((btn) => {
@@ -2104,6 +2173,8 @@ function renderOwnerPage() {
       box-sizing: border-box;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     body {
@@ -2588,6 +2659,8 @@ let ownerLocation = null;
           }
         } catch(e) {}
       }
+      document.addEventListener('contextmenu', (e) => e.preventDefault());
+
       async function confirmMove() {
         const btn = document.getElementById('confirmBtn');
         const shareLocation = document.getElementById('shareLocationToggle').checked;
@@ -2641,6 +2714,7 @@ let ownerLocation = null;
       let sourceIntensity = 0;
       let targetSourceIntensity = 0;
       let rafId = 0;
+      let pointerRaf = 0;
 
       const resetSpot = (btn) => {
         btn.style.setProperty('--bx', '-1000px');
@@ -2703,6 +2777,15 @@ let ownerLocation = null;
         });
       };
 
+      const scheduleUpdate = () => {
+        if (pointerRaf) return;
+        pointerRaf = requestAnimationFrame(() => {
+          pointerRaf = 0;
+          if (lastX > -9999) {
+            updateAll(lastX, lastY);
+          }
+        });
+      };
       const tick = () => {
         sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
         if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
@@ -2720,6 +2803,10 @@ let ownerLocation = null;
 
       const resetAll = () => {
         buttons.forEach(resetSpot);
+        if (pointerRaf) {
+          cancelAnimationFrame(pointerRaf);
+          pointerRaf = 0;
+        }
         sourceIntensity = 0;
         targetSourceIntensity = 0;
         sourceX = -10000;
@@ -2731,7 +2818,7 @@ let ownerLocation = null;
       document.addEventListener('pointermove', (e) => {
         lastX = e.clientX;
         lastY = e.clientY;
-        updateAll(lastX, lastY);
+        scheduleUpdate();
       });
 
       document.addEventListener('pointerout', (e) => {
@@ -2744,7 +2831,7 @@ let ownerLocation = null;
 
       window.addEventListener('blur', resetAll);
       window.addEventListener('resize', () => {
-        if (lastX > -9999) updateAll(lastX, lastY);
+        if (lastX > -9999) scheduleUpdate();
       });
 
       buttons.forEach((btn) => {
