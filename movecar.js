@@ -3,11 +3,18 @@ addEventListener('fetch', event => {
 })
 
 const CONFIG = { KV_TTL: 3600 }
+const SESSION_TTL_SECONDS = 1800;
 
 function isTruthyEnv(val) {
   if (val === undefined || val === null) return false;
   const v = String(val).trim().toLowerCase();
   return v !== '' && v !== 'false' && v !== '0' && v !== 'no';
+}
+
+function generateSessionId() {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function handleRequest(request) {
@@ -28,6 +35,14 @@ async function handleRequest(request) {
 
   if (path === '/api/get-phone' && request.method === 'POST') {
     return handleGetPhone();
+  }
+
+  if (path === '/api/get-session') {
+    return handleGetSession();
+  }
+
+  if (path === '/api/terminate-session' && request.method === 'POST') {
+    return handleTerminateSession();
   }
 
   if (path === '/api/clear-owner-location' && request.method === 'POST') {
@@ -111,6 +126,8 @@ async function handleNotify(request, url) {
     }
     // 新请求时清理上次车主位置，避免旧位置泄露
     await MOVE_CAR_STATUS.delete('owner_location');
+    const sessionId = generateSessionId();
+    await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_TTL_SECONDS });
 
     const body = await request.json();
     const message = body.message || '车旁有人等待';
@@ -306,6 +323,35 @@ function handleGetPhone() {
   return new Response(JSON.stringify({ success: true, phone: phone }), {
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+async function handleGetSession() {
+  if (typeof MOVE_CAR_STATUS === 'undefined') {
+    return new Response(JSON.stringify({ sessionId: null }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  const sessionId = await MOVE_CAR_STATUS.get('session_id');
+  return new Response(JSON.stringify({ sessionId: sessionId || null }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleTerminateSession() {
+  try {
+    if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+    await MOVE_CAR_STATUS.delete('session_id');
+    await MOVE_CAR_STATUS.delete('owner_location');
+    await MOVE_CAR_STATUS.put('notify_status', 'closed', { expirationTtl: 600 });
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ success: false }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 async function handleOwnerConfirmAction(request) {
@@ -2543,6 +2589,19 @@ function renderOwnerPage() {
       min-height: 16px;
     }
 
+    .session-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .session-info strong {
+      color: var(--text-primary);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
     /* Spot Button - with spotlight border effect */
     .spot-btn {
       --bx: -1000px;
@@ -2676,6 +2735,14 @@ function renderOwnerPage() {
       </label>
     </div>
 
+    <div id="sessionInfo" class="session-info">
+      来自 <strong id="sessionCode">#------</strong> 的挪车会话
+    </div>
+
+    <button id="endSessionBtn" class="btn-ghost spot-btn" onclick="terminateSession()" style="display:none;">
+      <span>终止会话</span>
+    </button>
+
     <button id="clearLocBtn" class="btn-ghost spot-btn" onclick="clearOwnerLocation()">
       <span>清除我的位置</span>
     </button>
@@ -2701,6 +2768,16 @@ let ownerLocation = null;
               document.getElementById('amapLink').href = data.amapUrl;
               document.getElementById('appleLink').href = data.appleUrl;
             }
+          }
+          const sessionRes = await fetch('/api/get-session');
+          const sessionData = await sessionRes.json();
+          const sessionInfo = document.getElementById('sessionInfo');
+          const sessionCode = document.getElementById('sessionCode');
+          const endBtn = document.getElementById('endSessionBtn');
+          if (sessionData && sessionData.sessionId) {
+            if (sessionCode) sessionCode.innerText = '#' + sessionData.sessionId;
+            if (sessionInfo) sessionInfo.style.display = 'block';
+            if (endBtn) endBtn.style.display = 'block';
           }
         } catch(e) {}
       }
@@ -2734,6 +2811,21 @@ let ownerLocation = null;
           if (msg) msg.innerText = '已清除位置';
         } catch (e) {
           if (msg) msg.innerText = '清除失败，请重试';
+        }
+        if (msg) {
+          setTimeout(() => { msg.innerText = ''; }, 2000);
+        }
+      }
+      async function terminateSession() {
+        const msg = document.getElementById('clearMsg');
+        try {
+          const res = await fetch('/api/terminate-session', { method: 'POST' });
+          if (!res.ok) throw new Error('TERMINATE_FAILED');
+          if (msg) msg.innerText = '会话已终止';
+          const endBtn = document.getElementById('endSessionBtn');
+          if (endBtn) endBtn.style.display = 'none';
+        } catch (e) {
+          if (msg) msg.innerText = '终止失败，请重试';
         }
         if (msg) {
           setTimeout(() => { msg.innerText = ''; }, 2000);
