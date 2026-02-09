@@ -490,8 +490,10 @@ function renderMainPage(origin) {
       }
       .btn-retry { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3); }
       .btn-retry:active { transform: scale(0.98); }
+      .btn-retry:disabled { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); box-shadow: none; cursor: not-allowed; }
       .btn-phone { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3); }
       .btn-phone:active { transform: scale(0.98); }
+      .btn-phone.disabled { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); box-shadow: none; cursor: not-allowed; pointer-events: none; }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       .loading-text { animation: pulse 1.5s ease-in-out infinite; }
       .modal-overlay {
@@ -535,6 +537,7 @@ function renderMainPage(origin) {
         position: relative;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         letter-spacing: 2px;
+        transform-style: preserve-3d;
       }
       .flip-card::after {
         content: '';
@@ -545,6 +548,15 @@ function renderMainPage(origin) {
         height: 2px;
         background: rgba(0,0,0,0.4);
         transform: translateY(-50%);
+      }
+      .flip-card.flip {
+        animation: flipDown 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+      }
+      @keyframes flipDown {
+        0% { transform: rotateX(0deg); }
+        49% { transform: rotateX(-90deg); }
+        50% { transform: rotateX(90deg); }
+        100% { transform: rotateX(0deg); }
       }
     </style>
   </head>
@@ -628,13 +640,13 @@ function renderMainPage(origin) {
       </div>
 
       <div class="card action-card">
-        <p class="action-hint">车主没反应？试试其他方式</p>
+        <p id="actionHint" class="action-hint">车主没反应？试试其他方式</p>
         <button id="retryBtn" class="btn-retry" onclick="retryNotify()">
           <span>🔔</span>
           <span>再次通知</span>
         </button>
         ${phone ? `
-        <a href="tel:${phone}" class="btn-phone">
+        <a id="phoneBtn" href="tel:${phone}" class="btn-phone">
           <span>📞</span>
           <span>直接打电话</span>
         </a>
@@ -651,6 +663,13 @@ function renderMainPage(origin) {
       let userLocation = null;
       let checkTimer = null;
       let delayTimer = null;
+      let retryCooldownTimer = null;
+      let phoneCooldownTimer = null;
+      let retryReadyAt = 0;
+      let phoneReadyAt = null;
+      let phoneDefaultHtml = '';
+      const RETRY_COOLDOWN_SECONDS = 30;
+      const CALL_COOLDOWN_SECONDS = 30;
       let countdownVal = 30;
       let map = null;
       let marker = null;
@@ -691,12 +710,104 @@ function renderMainPage(origin) {
       window.onload = () => {
         const toggle = document.getElementById('shareLocationToggle');
         toggle.addEventListener('change', handleLocationToggle);
+        initActionControls();
         if (toggle.checked) {
           requestLocation();
         } else {
           disableLocationSharing();
         }
       };
+      function initActionControls() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (phoneBtn) {
+          phoneDefaultHtml = phoneBtn.innerHTML;
+          disablePhoneUntilRetry();
+          phoneBtn.addEventListener('click', (e) => {
+            if (!isPhoneReady()) {
+              e.preventDefault();
+              showToast('⏳ 再次提醒后等待30秒再拨打电话');
+            }
+          });
+        }
+      }
+      function setActionHint(text) {
+        const el = document.getElementById('actionHint');
+        if (el && text) el.innerText = text;
+      }
+      function updateActionHint() {
+        const now = Date.now();
+        if (phoneReadyAt !== null && now < phoneReadyAt) {
+          const remaining = Math.max(0, Math.ceil((phoneReadyAt - now) / 1000));
+          setActionHint('再次提醒已发送，' + remaining + 's 后可拨打电话');
+          return;
+        }
+        if (now < retryReadyAt) {
+          const remaining = Math.max(0, Math.ceil((retryReadyAt - now) / 1000));
+          setActionHint('距离下次提醒还有 ' + remaining + 's');
+          return;
+        }
+        setActionHint('车主没反应？试试其他方式');
+      }
+      function startRetryCooldown(seconds) {
+        const btn = document.getElementById('retryBtn');
+        if (!btn) return;
+        if (retryCooldownTimer) clearInterval(retryCooldownTimer);
+        retryReadyAt = Date.now() + seconds * 1000;
+        btn.disabled = true;
+        updateRetryCountdown();
+        retryCooldownTimer = setInterval(updateRetryCountdown, 1000);
+      }
+      function updateRetryCountdown() {
+        const btn = document.getElementById('retryBtn');
+        if (!btn) return;
+        const remaining = Math.max(0, Math.ceil((retryReadyAt - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(retryCooldownTimer);
+          retryCooldownTimer = null;
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+          updateActionHint();
+          return;
+        }
+        btn.innerHTML = '<span>⏳</span><span>' + remaining + 's 后可再次提醒</span>';
+        updateActionHint();
+      }
+      function disablePhoneUntilRetry() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn) return;
+        phoneReadyAt = null;
+        phoneBtn.classList.add('disabled');
+        phoneBtn.innerHTML = '<span>📞</span><span>再次提醒后可拨打</span>';
+      }
+      function startPhoneCooldown(seconds) {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn) return;
+        if (phoneCooldownTimer) clearInterval(phoneCooldownTimer);
+        phoneReadyAt = Date.now() + seconds * 1000;
+        phoneBtn.classList.add('disabled');
+        updatePhoneCountdown();
+        phoneCooldownTimer = setInterval(updatePhoneCountdown, 1000);
+      }
+      function updatePhoneCountdown() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn || phoneReadyAt === null) return;
+        const remaining = Math.max(0, Math.ceil((phoneReadyAt - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(phoneCooldownTimer);
+          phoneCooldownTimer = null;
+          phoneBtn.classList.remove('disabled');
+          phoneBtn.innerHTML = phoneDefaultHtml || '<span>📞</span><span>直接打电话</span>';
+          phoneReadyAt = Date.now();
+          updateActionHint();
+          return;
+        }
+        phoneBtn.innerHTML = '<span>⏳</span><span>' + remaining + 's 后可拨打</span>';
+        updateActionHint();
+      }
+      function isPhoneReady() {
+        if (phoneReadyAt === null) return false;
+        return Date.now() >= phoneReadyAt;
+      }
       function showModal(id) { document.getElementById(id).classList.add('show'); }
       function hideModal(id) { document.getElementById(id).classList.remove('show'); }
       function requestLocation() {
@@ -829,7 +940,11 @@ function renderMainPage(origin) {
 
       function updateDelayMsg() {
          const el = document.getElementById('countdownNum');
-         if(el) el.innerText = countdownVal.toString().padStart(2, '0');
+         if (!el) return;
+         el.innerText = countdownVal.toString().padStart(2, '0');
+         el.classList.remove('flip');
+         void el.offsetWidth;
+         el.classList.add('flip');
       }
 
       function cancelDelay() {
@@ -875,6 +990,9 @@ function renderMainPage(origin) {
             if (mainView) mainView.style.display = 'none';
             const successView = document.getElementById('successView');
             if (successView) successView.style.display = 'flex';
+            startRetryCooldown(RETRY_COOLDOWN_SECONDS);
+            disablePhoneUntilRetry();
+            updateActionHint();
             startPolling();
           } else {
             // 显示后端返回的具体错误信息
@@ -920,6 +1038,11 @@ function renderMainPage(origin) {
       }
       async function retryNotify() {
         const btn = document.getElementById('retryBtn');
+        if (Date.now() < retryReadyAt) {
+          showToast('⏳ 请等待倒计时结束再提醒');
+          return;
+        }
+        let success = false;
         btn.disabled = true;
         btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
         try {
@@ -938,10 +1061,15 @@ function renderMainPage(origin) {
             }
             showToast('✅ 再次通知已发送！');
             document.getElementById('waitingText').innerText = '已再次通知，等待车主回应...';
+            startRetryCooldown(RETRY_COOLDOWN_SECONDS);
+            startPhoneCooldown(CALL_COOLDOWN_SECONDS);
+            success = true;
           } else { throw new Error('API Error'); }
         } catch (e) { showToast('❌ 发送失败，请重试'); }
-        btn.disabled = false;
-        btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+        if (!success) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+        }
       }
     </script>
   </body>
