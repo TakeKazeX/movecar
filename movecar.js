@@ -30,6 +30,10 @@ async function handleRequest(request) {
     return handleGetPhone();
   }
 
+  if (path === '/api/clear-owner-location' && request.method === 'POST') {
+    return handleClearOwnerLocation();
+  }
+
   if (path === '/api/check-status') {
     // 检查 KV 是否绑定，防止直接报错
     if (typeof MOVE_CAR_STATUS === 'undefined') {
@@ -105,6 +109,8 @@ async function handleNotify(request, url) {
     if (typeof MOVE_CAR_STATUS === 'undefined') {
       throw new Error('KV 数据库未绑定！请在 Cloudflare 后台 Settings -> Bindings 中绑定 MOVE_CAR_STATUS');
     }
+    // 新请求时清理上次车主位置，避免旧位置泄露
+    await MOVE_CAR_STATUS.delete('owner_location');
 
     const body = await request.json();
     const message = body.message || '车旁有人等待';
@@ -316,6 +322,8 @@ async function handleOwnerConfirmAction(request) {
         ...urls,
         timestamp: Date.now()
       }), { expirationTtl: CONFIG.KV_TTL });
+    } else {
+      await MOVE_CAR_STATUS.delete('owner_location');
     }
 
     await MOVE_CAR_STATUS.put('notify_status', 'confirmed', { expirationTtl: 600 });
@@ -328,6 +336,21 @@ async function handleOwnerConfirmAction(request) {
       await MOVE_CAR_STATUS.put('notify_status', 'confirmed', { expirationTtl: 600 });
     }
     return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleClearOwnerLocation() {
+  try {
+    if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+    await MOVE_CAR_STATUS.delete('owner_location');
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ success: false }), {
+      status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -1348,7 +1371,7 @@ function renderMainPage(origin) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.0.0.beta1</div>
+        v2.0.0.beta2</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -2503,6 +2526,23 @@ function renderOwnerPage() {
       cursor: not-allowed;
     }
 
+    .btn-ghost {
+      width: 100%;
+      padding: 12px 0;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--text-secondary);
+    }
+
+    .clear-msg {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
     /* Spot Button - with spotlight border effect */
     .spot-btn {
       --bx: -1000px;
@@ -2636,6 +2676,11 @@ function renderOwnerPage() {
       </label>
     </div>
 
+    <button id="clearLocBtn" class="btn-ghost spot-btn" onclick="clearOwnerLocation()">
+      <span>清除我的位置</span>
+    </button>
+    <div id="clearMsg" class="clear-msg"></div>
+
     <button id="confirmBtn" class="btn spot-btn" onclick="confirmMove()">
       <span>🚀</span>
       <span>我已知晓，正在前往</span>
@@ -2679,6 +2724,19 @@ let ownerLocation = null;
         } else {
             ownerLocation = null;
             await doConfirm();
+        }
+      }
+      async function clearOwnerLocation() {
+        const msg = document.getElementById('clearMsg');
+        try {
+          const res = await fetch('/api/clear-owner-location', { method: 'POST' });
+          if (!res.ok) throw new Error('CLEAR_FAILED');
+          if (msg) msg.innerText = '已清除位置';
+        } catch (e) {
+          if (msg) msg.innerText = '清除失败，请重试';
+        }
+        if (msg) {
+          setTimeout(() => { msg.innerText = ''; }, 2000);
         }
       }
       async function doConfirm() {
