@@ -11,6 +11,16 @@ function isTruthyEnv(val) {
   return v !== '' && v !== 'false' && v !== '0' && v !== 'no';
 }
 
+function getCookie(request, name) {
+  const cookie = request.headers.get('Cookie') || '';
+  const parts = cookie.split(';');
+  for (const part of parts) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
 function generateSessionId() {
   const bytes = new Uint8Array(3);
   crypto.getRandomValues(bytes);
@@ -38,7 +48,7 @@ async function handleRequest(request) {
   }
 
   if (path === '/api/get-session') {
-    return handleGetSession();
+    return handleGetSession(request);
   }
 
   if (path === '/api/terminate-session' && request.method === 'POST') {
@@ -54,11 +64,45 @@ async function handleRequest(request) {
     if (typeof MOVE_CAR_STATUS === 'undefined') {
       return new Response(JSON.stringify({ status: 'error', error: 'KV_NOT_BOUND' }), { headers: { 'Content-Type': 'application/json' } });
     }
+    const sessionId = await MOVE_CAR_STATUS.get('session_id');
+    const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
+    const sessionCompletedAt = await MOVE_CAR_STATUS.get('session_completed_at');
+    const completedAtNum = sessionCompletedAt ? Number(sessionCompletedAt) : null;
+    if ((sessionStatus === 'confirmed' || sessionStatus === 'closed') && completedAtNum && Date.now() - completedAtNum > 600000) {
+      await MOVE_CAR_STATUS.delete('session_id');
+      await MOVE_CAR_STATUS.delete('session_status');
+      await MOVE_CAR_STATUS.delete('session_completed_at');
+      await MOVE_CAR_STATUS.delete('owner_location');
+      return new Response(JSON.stringify({
+        status: 'waiting',
+        ownerLocation: null,
+        sessionId: null,
+        sessionStatus: null,
+        sessionCompletedAt: null
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    const cookieSession = getCookie(request, 'mc_session');
+    if (!sessionId || !cookieSession || cookieSession !== sessionId) {
+      return new Response(JSON.stringify({
+        status: 'waiting',
+        ownerLocation: null,
+        sessionId: null,
+        sessionStatus: null,
+        sessionCompletedAt: null
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     const status = await MOVE_CAR_STATUS.get('notify_status');
     const ownerLocation = await MOVE_CAR_STATUS.get('owner_location');
     return new Response(JSON.stringify({
       status: status || 'waiting',
-      ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null
+      ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null,
+      sessionId: sessionId || null,
+      sessionStatus: sessionStatus || null,
+      sessionCompletedAt: completedAtNum || null
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -128,6 +172,8 @@ async function handleNotify(request, url) {
     await MOVE_CAR_STATUS.delete('owner_location');
     const sessionId = generateSessionId();
     await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_TTL_SECONDS });
+    await MOVE_CAR_STATUS.put('session_status', 'active', { expirationTtl: SESSION_TTL_SECONDS });
+    await MOVE_CAR_STATUS.delete('session_completed_at');
 
     const body = await request.json();
     const message = body.message || '车旁有人等待';
@@ -284,13 +330,17 @@ async function handleNotify(request, url) {
 
     const responsePayload = {
       success: true,
+      sessionId: sessionId,
       serviceCount: results.length,
       details: results
     };
     if (localMeowRequest) responsePayload.localMeowRequest = localMeowRequest;
 
     return new Response(JSON.stringify(responsePayload), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `mc_session=${sessionId}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; SameSite=Lax`
+      }
     });
 
   } catch (error) {
@@ -325,14 +375,36 @@ function handleGetPhone() {
   });
 }
 
-async function handleGetSession() {
+async function handleGetSession(request) {
   if (typeof MOVE_CAR_STATUS === 'undefined') {
     return new Response(JSON.stringify({ sessionId: null }), {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+  const url = new URL(request.url);
+  const role = url.searchParams.get('role');
   const sessionId = await MOVE_CAR_STATUS.get('session_id');
-  return new Response(JSON.stringify({ sessionId: sessionId || null }), {
+  const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
+  const sessionCompletedAt = await MOVE_CAR_STATUS.get('session_completed_at');
+  const completedAtNum = sessionCompletedAt ? Number(sessionCompletedAt) : null;
+  if ((sessionStatus === 'confirmed' || sessionStatus === 'closed') && completedAtNum && Date.now() - completedAtNum > 600000) {
+    await MOVE_CAR_STATUS.delete('session_id');
+    await MOVE_CAR_STATUS.delete('session_status');
+    await MOVE_CAR_STATUS.delete('session_completed_at');
+    await MOVE_CAR_STATUS.delete('owner_location');
+    return new Response(JSON.stringify({ sessionId: null, sessionStatus: null, sessionCompletedAt: null }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  if (role !== 'owner') {
+    const cookieSession = getCookie(request, 'mc_session');
+    if (!sessionId || !cookieSession || cookieSession !== sessionId) {
+      return new Response(JSON.stringify({ sessionId: null, sessionStatus: null, sessionCompletedAt: null }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  return new Response(JSON.stringify({ sessionId: sessionId || null, sessionStatus: sessionStatus || null, sessionCompletedAt: completedAtNum || null }), {
     headers: { 'Content-Type': 'application/json' }
   });
 }
@@ -340,8 +412,13 @@ async function handleGetSession() {
 async function handleTerminateSession() {
   try {
     if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
-    await MOVE_CAR_STATUS.delete('session_id');
     await MOVE_CAR_STATUS.delete('owner_location');
+    const sessionId = await MOVE_CAR_STATUS.get('session_id');
+    if (sessionId) {
+      await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: 600 });
+    }
+    await MOVE_CAR_STATUS.put('session_status', 'closed', { expirationTtl: 600 });
+    await MOVE_CAR_STATUS.put('session_completed_at', String(Date.now()), { expirationTtl: 600 });
     await MOVE_CAR_STATUS.put('notify_status', 'closed', { expirationTtl: 600 });
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -372,6 +449,12 @@ async function handleOwnerConfirmAction(request) {
       await MOVE_CAR_STATUS.delete('owner_location');
     }
 
+    const sessionId = await MOVE_CAR_STATUS.get('session_id');
+    if (sessionId) {
+      await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: 600 });
+    }
+    await MOVE_CAR_STATUS.put('session_status', 'confirmed', { expirationTtl: 600 });
+    await MOVE_CAR_STATUS.put('session_completed_at', String(Date.now()), { expirationTtl: 600 });
     await MOVE_CAR_STATUS.put('notify_status', 'confirmed', { expirationTtl: 600 });
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -1110,6 +1193,35 @@ function renderMainPage(origin) {
       display: none;
     }
 
+    .session-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .session-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .session-expire {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .session-card strong {
+      color: var(--text-primary);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -1417,7 +1529,7 @@ function renderMainPage(origin) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.0.0.beta2</div>
+        v2.1.4.beta1</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -1433,6 +1545,13 @@ function renderMainPage(origin) {
       </div>
       <div id="mapContainer" class="card"
         style="display:none; height: 200px; padding: 0; overflow: hidden; margin-top: -10px;"></div>
+      <div id="sessionInfoUser" class="card session-card" style="display:none;">
+        <div class="session-row">
+          <span>会话 <strong id="sessionCodeUser">#------</strong></span>
+          <span id="sessionStatusUser">进行中</span>
+        </div>
+        <div id="sessionExpire" class="session-expire" style="display:none;"></div>
+      </div>
       <button id="notifyBtn" class="btn-main spot-btn" onclick="sendNotify()">
         <span>🔔</span>
         <span>一键通知车主</span>
@@ -1493,6 +1612,9 @@ let userLocation = null;
       let retryCooldownSeconds = 30;
       let callCooldownSeconds = 30;
       let ownerConfirmed = false;
+      let currentSessionId = null;
+      let currentSessionStatus = null;
+      let currentSessionCompletedAt = null;
       let countdownVal = 30;
       let lastCountdownVal = null;
       let map = null;
@@ -1535,10 +1657,15 @@ let userLocation = null;
         const toggle = document.getElementById('shareLocationToggle');
         toggle.addEventListener('change', handleLocationToggle);
         initActionControls();
+        refreshSessionInfo();
         if (toggle.checked) {
           requestLocation();
         } else {
           disableLocationSharing();
+        }
+        const sessionCard = document.getElementById('sessionInfoUser');
+        if (sessionCard) {
+          sessionCard.addEventListener('click', () => resumeSession());
         }
       };
       function initActionControls() {
@@ -1564,6 +1691,113 @@ let userLocation = null;
       function setActionHint(text) {
         const el = document.getElementById('actionHint');
         if (el && text) el.innerText = text;
+      }
+      function formatSessionStatus(raw) {
+        if (raw === 'confirmed' || raw === 'closed') return '已结束挪车会话';
+        return '进行中';
+      }
+      function formatExpireText(ts) {
+        const date = new Date(ts);
+        const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return '销毁时间 ' + time;
+      }
+      function applySessionInfo(data) {
+        const info = document.getElementById('sessionInfoUser');
+        const code = document.getElementById('sessionCodeUser');
+        const status = document.getElementById('sessionStatusUser');
+        const expire = document.getElementById('sessionExpire');
+        currentSessionId = data && data.sessionId ? data.sessionId : null;
+        currentSessionStatus = data && data.sessionStatus ? data.sessionStatus : null;
+        currentSessionCompletedAt = data && data.sessionCompletedAt ? Number(data.sessionCompletedAt) : null;
+        if (currentSessionId) {
+          if (code) code.innerText = '#' + currentSessionId;
+          if (status) status.innerText = formatSessionStatus(currentSessionStatus);
+          if (currentSessionCompletedAt && (currentSessionStatus === 'confirmed' || currentSessionStatus === 'closed')) {
+            if (expire) {
+              expire.innerText = formatExpireText(currentSessionCompletedAt + 600000);
+              expire.style.display = 'block';
+            }
+          } else if (expire) {
+            expire.style.display = 'none';
+          }
+          if (info) info.style.display = 'flex';
+        } else if (info) {
+          info.style.display = 'none';
+        }
+      }
+      function resumeSession() {
+        if (!currentSessionId) return;
+        const mainView = document.getElementById('mainView');
+        const successView = document.getElementById('successView');
+        if (mainView) mainView.style.display = 'none';
+        if (successView) successView.style.display = 'flex';
+        startPolling();
+        syncStatusOnce();
+      }
+      async function syncStatusOnce() {
+        try {
+          const res = await fetch('/api/check-status');
+          const data = await res.json();
+          handleStatusResponse(data);
+        } catch (e) {}
+      }
+      function handleStatusResponse(data) {
+        if (data && (data.sessionId || data.sessionStatus || data.sessionCompletedAt)) {
+          applySessionInfo(data);
+        }
+        const retryBtn = document.getElementById('retryBtn');
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (data.status === 'confirmed') {
+          const fb = document.getElementById('ownerFeedback');
+          if (fb) fb.classList.remove('hidden');
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = 'none';
+          const sessionStatus = document.getElementById('sessionStatusUser');
+          if (sessionStatus) sessionStatus.innerText = '已结束挪车会话';
+          if (data.ownerLocation && data.ownerLocation.amapUrl) {
+            const mapLinks = document.getElementById('ownerMapLinks');
+            if (mapLinks) mapLinks.style.display = 'flex';
+            const amapLink = document.getElementById('ownerAmapLink');
+            if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
+            const appleLink = document.getElementById('ownerAppleLink');
+            if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
+          }
+          if (retryBtn) {
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = '<span>✅</span><span>会话已完成</span>';
+          }
+          if (phoneBtn) {
+            phoneBtn.disabled = true;
+            phoneBtn.classList.add('disabled');
+            phoneBtn.innerHTML = '<span>📞</span><span>会话已完成</span>';
+          }
+          setActionHint('会话已完成，需重新发起通知');
+        } else if (data.status === 'closed') {
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = 'none';
+          const sessionStatus = document.getElementById('sessionStatusUser');
+          if (sessionStatus) sessionStatus.innerText = '已结束挪车会话';
+          if (retryBtn) {
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = '<span>✅</span><span>会话已结束</span>';
+          }
+          if (phoneBtn) {
+            phoneBtn.disabled = true;
+            phoneBtn.classList.add('disabled');
+            phoneBtn.innerHTML = '<span>📞</span><span>会话已结束</span>';
+          }
+          setActionHint('会话已结束，需重新发起通知');
+        } else {
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = '';
+        }
+      }
+      async function refreshSessionInfo() {
+        try {
+          const res = await fetch('/api/get-session');
+          const data = await res.json();
+          applySessionInfo(data);
+        } catch (e) {}
       }
       function updateActionHint() {
         const now = Date.now();
@@ -1822,6 +2056,11 @@ let userLocation = null;
       }
 
       function sendNotify() {
+        if (currentSessionId && currentSessionStatus === 'active') {
+          showToast('已有进行中的会话，已为你打开');
+          resumeSession();
+          return;
+        }
         const shareLocation = document.getElementById('shareLocationToggle').checked;
         const locationToSend = shareLocation ? userLocation : null;
         
@@ -1859,6 +2098,9 @@ let userLocation = null;
             if (mainView) mainView.style.display = 'none';
             const successView = document.getElementById('successView');
             if (successView) successView.style.display = 'flex';
+            if (data.sessionId) {
+              applySessionInfo({ sessionId: data.sessionId, sessionStatus: 'active', sessionCompletedAt: null });
+            }
             startRetryCooldown(retryCooldownSeconds);
             disablePhoneUntilRetry();
             updateActionHint();
@@ -1884,29 +2126,18 @@ let userLocation = null;
           try {
             const res = await fetch('/api/check-status');
             const data = await res.json();
+            handleStatusResponse(data);
             if (data.status === 'confirmed') {
-              const fb = document.getElementById('ownerFeedback');
-              fb.classList.remove('hidden');
-              const waitingCard = document.getElementById('waitingCard');
-              if (waitingCard) waitingCard.style.display = 'none';
-              if (data.ownerLocation && data.ownerLocation.amapUrl) {
-                const mapLinks = document.getElementById('ownerMapLinks');
-                if (mapLinks) mapLinks.style.display = 'flex';
-                const amapLink = document.getElementById('ownerAmapLink');
-                if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
-                const appleLink = document.getElementById('ownerAppleLink');
-                if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
-              }
               if (!ownerConfirmed) {
                 ownerConfirmed = true;
                 retryCooldownSeconds = 60;
                 callCooldownSeconds = 180;
-                startRetryCooldown(retryCooldownSeconds);
-                disablePhoneUntilRetry();
                 updateActionHint();
               }
               clearInterval(checkTimer);
               if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            } else if (data.status === 'closed') {
+              clearInterval(checkTimer);
             }
           } catch(e) {}
         }, 3000);
@@ -2769,7 +3000,7 @@ let ownerLocation = null;
               document.getElementById('appleLink').href = data.appleUrl;
             }
           }
-          const sessionRes = await fetch('/api/get-session');
+          const sessionRes = await fetch('/api/get-session?role=owner');
           const sessionData = await sessionRes.json();
           const sessionInfo = document.getElementById('sessionInfo');
           const sessionCode = document.getElementById('sessionCode');
