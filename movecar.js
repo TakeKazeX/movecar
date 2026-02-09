@@ -320,255 +320,973 @@ function renderMainPage(origin) {
   const phone = typeof PHONE_NUMBER !== 'undefined' ? PHONE_NUMBER : '';
 
   const html = `
-  <!DOCTYPE html>
-  <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0093E9">
-    <title>通知车主挪车</title>
-    <style>
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#050505">
+  <title>通知车主挪车</title>
+  <style>
+    :root {
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      --card-max-width: 560px;
+      --card-padding: 1.8rem;
+      --card-radius: 28px;
+
+      --text-glow: 0 1px 3px rgba(0, 0, 0, 0.35);
+
+      --bg-base: #0a0a0c;
+      --glass-surface: rgba(20, 20, 24, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --glass-glow: rgba(255, 255, 255, 0.08);
+      --glass-blur: 12px;
+      --glass-edge-size: 1.5px;
+      --card-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.35);
+
+      --card-spotlight-size: 200px;
+      --card-spotlight-color: rgba(255, 255, 255, 0.06);
+
+      --btn-spotlight-size: 120px;
+      --btn-source-size: 280px;
+      --btn-source-rgb: 255, 255, 255;
+      --btn-border-rgb: 255, 255, 255;
+      --btn-hover-glow: rgba(255, 255, 255, 0.12);
+
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.65);
+      --accent: #ffffff;
+
+      --btn-bg: rgba(255, 255, 255, 0.06);
+      --btn-base-border: rgba(255, 255, 255, 0.08);
+      --btn-hover-bg: #ffffff;
+      --btn-hover-text: #000000;
+      --btn-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+      --toggle-bg: rgba(255, 255, 255, 0.12);
+      --toggle-border: rgba(255, 255, 255, 0.18);
+      --toggle-checked-bg: #22c55e;
+      --toggle-checked-border: #16a34a;
+      --toggle-knob: #ffffff;
+
+      --fluid-1: rgba(139, 92, 246, 0.35);
+      --fluid-2: rgba(236, 72, 153, 0.32);
+      --fluid-3: rgba(59, 130, 246, 0.30);
+      --fluid-4: rgba(251, 146, 60, 0.28);
+      --fluid-5: rgba(168, 85, 247, 0.26);
+      --fluid-6: rgba(14, 165, 233, 0.24);
+      --fluid-base-1: #0a0a14;
+      --fluid-base-2: #1a0a28;
+      --fluid-base-3: #0a1428;
+    }
+
+    @media (prefers-color-scheme: light) {
       :root {
-        --sat: env(safe-area-inset-top, 0px);
-        --sar: env(safe-area-inset-right, 0px);
-        --sab: env(safe-area-inset-bottom, 0px);
-        --sal: env(safe-area-inset-left, 0px);
+        --bg-base: #f0f4ff;
+        --glass-surface: rgba(255, 255, 255, 0.45);
+        --glass-border: rgba(0, 0, 0, 0.08);
+        --glass-glow: rgba(255, 255, 255, 0.5);
+        --glass-blur: 10px;
+        --card-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12);
+
+        --card-spotlight-color: rgba(255, 255, 255, 0.5);
+
+        --btn-source-rgb: 60, 60, 70;
+        --btn-border-rgb: 80, 90, 110;
+        --btn-hover-glow: rgba(0, 0, 0, 0.04);
+
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-glow: 0 1px 2px rgba(0, 0, 0, 0.15);
+
+        --btn-bg: rgba(255, 255, 255, 0.65);
+        --btn-base-border: rgba(0, 0, 0, 0.1);
+        --btn-hover-bg: #18181b;
+        --btn-hover-text: #ffffff;
+        --btn-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+        --toggle-bg: rgba(15, 23, 42, 0.1);
+        --toggle-border: rgba(15, 23, 42, 0.2);
+
+        --fluid-1: rgba(217, 70, 239, 0.45);
+        --fluid-2: rgba(59, 130, 246, 0.40);
+        --fluid-3: rgba(251, 191, 36, 0.48);
+        --fluid-4: rgba(236, 72, 153, 0.42);
+        --fluid-5: rgba(139, 92, 246, 0.38);
+        --fluid-6: rgba(34, 197, 94, 0.35);
+        --fluid-base-1: #f8f0ff;
+        --fluid-base-2: #fff0f8;
+        --fluid-base-3: #fff7ed;
       }
-      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-      html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-      html, body { height: 100%; }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(160deg, var(--bg-base) 0%, #0f0f12 100%);
+      color: var(--text-primary);
+      text-shadow: var(--text-glow);
+      overflow-x: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: clamp(16px, 4vw, 24px);
+      padding-top: calc(clamp(16px, 4vw, 24px) + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(clamp(16px, 4vw, 24px) + env(safe-area-inset-bottom, 0px));
+    }
+
+    @media (prefers-color-scheme: light) {
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-        background: linear-gradient(160deg, #0093E9 0%, #80D0C7 100%);
-        min-height: 100vh;
-        min-height: -webkit-fill-available;
-        padding: clamp(16px, 4vw, 24px);
-        padding-top: calc(clamp(16px, 4vw, 24px) + var(--sat));
-        padding-bottom: calc(clamp(16px, 4vw, 24px) + var(--sab));
-        padding-left: calc(clamp(16px, 4vw, 24px) + var(--sal));
-        padding-right: calc(clamp(16px, 4vw, 24px) + var(--sar));
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
+        background: linear-gradient(160deg, var(--bg-base) 0%, #d4dae6 100%);
       }
-      body::before {
-        content: ''; position: fixed; inset: 0;
-        background: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        z-index: -1;
+    }
+
+    /* Fluid Background */
+    .bg-fluid {
+      position: fixed;
+      inset: -25%;
+      z-index: -10;
+      background:
+        radial-gradient(40% 50% at 15% 20%, var(--fluid-1), transparent 70%),
+        radial-gradient(45% 55% at 85% 15%, var(--fluid-2), transparent 70%),
+        radial-gradient(50% 60% at 35% 85%, var(--fluid-3), transparent 70%),
+        radial-gradient(40% 50% at 80% 80%, var(--fluid-4), transparent 70%),
+        linear-gradient(120deg, var(--fluid-base-1) 0%, var(--fluid-base-2) 50%, var(--fluid-base-3) 100%);
+      opacity: 1;
+      animation: fluid-drift 18s ease-in-out infinite alternate, fluid-shift 28s ease-in-out infinite;
+      pointer-events: none;
+      filter: saturate(1.3) contrast(1.05) brightness(1.1);
+    }
+
+    .bg-fluid::before,
+    .bg-fluid::after {
+      content: "";
+      position: absolute;
+      inset: -30%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .bg-fluid::before {
+      background:
+        radial-gradient(55% 60% at 20% 30%, var(--fluid-5), transparent 70%),
+        radial-gradient(60% 65% at 75% 65%, var(--fluid-6), transparent 72%),
+        radial-gradient(45% 55% at 60% 15%, rgba(255, 255, 255, 0.08), transparent 70%);
+      opacity: 0.85;
+      filter: blur(3px);
+      animation: fluid-float 22s ease-in-out infinite;
+    }
+
+    .bg-fluid::after {
+      background:
+        radial-gradient(60% 70% at 30% 75%, rgba(139, 92, 246, 0.20), transparent 70%),
+        radial-gradient(50% 60% at 70% 35%, rgba(236, 72, 153, 0.18), transparent 70%),
+        radial-gradient(55% 65% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 75%);
+      opacity: 0.7;
+      filter: blur(8px);
+      animation: fluid-sway 30s ease-in-out infinite alternate;
+    }
+
+    .bg-noise {
+      position: fixed;
+      inset: 0;
+      z-index: -5;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px);
+      opacity: 0.12;
+      pointer-events: none;
+      mix-blend-mode: soft-light;
+    }
+
+    @keyframes fluid-drift {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
       }
+
+      50% {
+        transform: translate3d(-3%, 2.5%, 0) scale(1.08);
+      }
+
+      100% {
+        transform: translate3d(3%, -2%, 0) scale(1.05);
+      }
+    }
+
+    @keyframes fluid-float {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate3d(4%, -3%, 0) scale(1.10);
+      }
+
+      100% {
+        transform: translate3d(-3%, 2%, 0) scale(1.06);
+      }
+    }
+
+    @keyframes fluid-sway {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate3d(-4%, 3.5%, 0) scale(1.09);
+      }
+
+      100% {
+        transform: translate3d(3%, -2.5%, 0) scale(1.05);
+      }
+    }
+
+    @keyframes fluid-shift {
+      0% {
+        background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
+      }
+
+      50% {
+        background-position: 10% 5%, 90% 10%, 20% 90%, 75% 70%, 45% 55%;
+      }
+
+      100% {
+        background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
+      }
+    }
+
+    .main-container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--card-max-width);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(12px, 3vw, 18px);
+    }
+
+    /* Glass Card */
+    .card {
+      --gx: -1000px;
+      --gy: -1000px;
+      background:
+        radial-gradient(var(--card-spotlight-size) circle at var(--gx) var(--gy), var(--card-spotlight-color), transparent 100%),
+        var(--glass-surface);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      padding: var(--card-padding);
+      width: 100%;
+      box-shadow:
+        var(--card-shadow),
+        inset 0 0 0 0.5px var(--glass-glow);
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Card edge highlight */
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: var(--glass-edge-size);
+      background: linear-gradient(180deg,
+          rgba(255, 255, 255, 0.12) 0%,
+          rgba(255, 255, 255, 0) 50%,
+          rgba(255, 255, 255, 0.04) 100%);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: clamp(12px, 3vw, 20px);
+    }
+
+    .icon-wrap {
+      width: clamp(56px, 14vw, 78px);
+      height: clamp(56px, 14vw, 78px);
+      border-radius: clamp(16px, 4vw, 22px);
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(28px, 7vw, 38px);
+      flex-shrink: 0;
+    }
+
+    .header-content h1 {
+      font-size: clamp(22px, 5.5vw, 28px);
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .header-content p {
+      font-size: clamp(13px, 3.5vw, 15px);
+      color: var(--text-secondary);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .input-card {
+      padding: 0;
+    }
+
+    .input-card textarea {
+      width: 100%;
+      min-height: 90px;
+      padding: clamp(14px, 3.5vw, 20px);
+      border: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 16px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+
+    .input-card textarea::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.7;
+    }
+
+    .tags {
+      display: flex;
+      gap: clamp(6px, 2vw, 10px);
+      padding: 0 clamp(12px, 3vw, 20px) clamp(14px, 3vw, 20px);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .tags::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tag {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      padding: 10px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .tag:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .loc-card {
+      display: flex;
+      align-items: center;
+      gap: clamp(10px, 3vw, 16px);
+      cursor: pointer;
+      min-height: 64px;
+    }
+
+    .loc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .loc-icon {
+      width: clamp(44px, 11vw, 56px);
+      height: clamp(44px, 11vw, 56px);
+      border-radius: clamp(14px, 3.5vw, 18px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(22px, 5.5vw, 28px);
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.1);
+      transition: background 0.3s ease;
+    }
+
+    .loc-icon.loading {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .loc-icon.ready {
+      background: rgba(34, 197, 94, 0.2);
+    }
+
+    .loc-icon.error {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .loc-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .loc-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .loc-status {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Toggle */
+    .toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      width: 52px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      border-radius: 999px;
+      transition: background 0.25s, border 0.25s;
+    }
+
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      height: 24px;
+      width: 24px;
+      left: 2px;
+      top: 2px;
+      background: var(--toggle-knob);
+      border-radius: 50%;
+      transition: transform 0.25s var(--ease-elastic);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle input:checked+.toggle-slider {
+      background: var(--toggle-checked-bg);
+      border-color: var(--toggle-checked-border);
+    }
+
+    .toggle input:checked+.toggle-slider::before {
+      transform: translateX(22px);
+    }
+
+    /* Spot Button - with spotlight border effect */
+    .spot-btn {
+      --bx: -1000px;
+      --by: -1000px;
+      --sx: -1000px;
+      --sy: -1000px;
+      --si: 0;
+      --border-alpha: 0.06;
+      --rx: 50%;
+      --ry: 50%;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        radial-gradient(var(--btn-spotlight-size) circle at var(--bx) var(--by), var(--btn-hover-glow), transparent 100%),
+        var(--glass-surface);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        var(--btn-shadow),
+        inset 0 0 0 0.5px var(--glass-glow);
+      transition: transform 0.3s var(--ease-out-expo);
+    }
+
+    .spot-btn>span {
+      position: relative;
+      z-index: 5;
+    }
+
+    /* Spotlight border - using mask technique */
+    .spot-btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background:
+        radial-gradient(var(--btn-spotlight-size) circle at var(--bx) var(--by), rgba(var(--btn-border-rgb), 0.85), transparent 100%),
+        radial-gradient(var(--btn-source-size) circle at var(--sx) var(--sy), rgba(var(--btn-source-rgb), calc(0.9 * var(--si))), transparent 80%),
+        linear-gradient(rgba(var(--btn-border-rgb), var(--border-alpha)), rgba(var(--btn-border-rgb), var(--border-alpha)));
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Ripple effect */
+    .spot-btn::after {
+      content: "";
+      position: absolute;
+      width: var(--rsize, 320px);
+      height: var(--rsize, 320px);
+      border-radius: 50%;
+      left: var(--rx);
+      top: var(--ry);
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: var(--btn-hover-bg);
+      transition: transform var(--ripple-ms, 280ms) var(--ease-out-expo), opacity var(--ripple-ms, 280ms) ease;
+    }
+
+    .spot-btn.ripple-on::after {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .spot-btn.ripple-on>span {
+      color: var(--btn-hover-text);
+    }
+
+    /* Main button */
+    .btn-main {
+      width: 100%;
+      padding: clamp(16px, 4vw, 20px);
+      border: none;
+      border-radius: var(--card-radius);
+      font-size: clamp(16px, 4vw, 18px);
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text-primary);
+      min-height: 56px;
+    }
+
+    .btn-main:active {
+      transform: scale(0.98);
+    }
+
+    .btn-main:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Action buttons */
+    .action-card {
+      text-align: center;
+    }
+
+    .action-hint {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .btn-retry,
+    .btn-phone {
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      text-decoration: none;
+    }
+
+    .btn-retry:disabled,
+    .btn-phone.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Map links */
+    .map-links {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .map-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .map-btn.amap {
+      background: rgba(24, 144, 255, 0.2);
+      color: #60a5fa;
+    }
+
+    .map-btn.apple {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .owner-card {
+      text-align: center;
+    }
+
+    .owner-card h3 {
+      font-size: 20px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .owner-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .owner-card.hidden {
+      display: none;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: calc(20px + env(safe-area-inset-top, 0px));
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 14px 24px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 500;
+      z-index: 1000;
+      opacity: 0;
+      transition: transform 0.4s var(--ease-out-expo), opacity 0.3s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-box {
+      background: var(--glass-surface);
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: clamp(24px, 6vw, 32px);
+      max-width: 340px;
+      width: 100%;
+      text-align: center;
+      transform: scale(0.9);
+      transition: transform 0.3s var(--ease-out-expo);
+      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-overlay.show .modal-box {
+      transform: scale(1);
+    }
+
+    .modal-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .modal-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      color: var(--text-primary);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-btn:active {
+      transform: scale(0.96);
+    }
+
+    .modal-btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    /* Countdown */
+    .countdown-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    .flip-card {
+      --flip-bg: rgba(10, 10, 14, 0.9);
+      position: relative;
+      width: clamp(120px, 30vw, 150px);
+      height: clamp(90px, 22vw, 120px);
+      border-radius: 14px;
+      background: var(--flip-bg);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      perspective: 800px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: clamp(56px, 14vw, 80px);
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    .flip-half {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 50%;
+      overflow: hidden;
+      background: var(--flip-bg);
+      backface-visibility: hidden;
+    }
+
+    .flip-top {
+      top: 0;
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+    }
+
+    .flip-bottom {
+      bottom: 0;
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+    }
+
+    .flip-text {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 200%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    }
+
+    .flip-top .flip-text {
+      top: 0;
+    }
+
+    .flip-bottom .flip-text {
+      bottom: 0;
+    }
+
+    .flip-static {
+      z-index: 1;
+    }
+
+    .flip-anim {
+      z-index: 3;
+      transform-style: preserve-3d;
+    }
+
+    .flip-top.flip-anim {
+      transform-origin: bottom;
+    }
+
+    .flip-bottom.flip-anim {
+      transform-origin: top;
+      transform: rotateX(90deg);
+    }
+
+    .flip-card::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(0, 0, 0, 0.5);
+      transform: translateY(-50%);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .flip-card.flip .flip-top.flip-anim {
+      animation: flipTop 0.32s var(--ease-out-expo) forwards;
+    }
+
+    .flip-card.flip .flip-bottom.flip-anim {
+      animation: flipBottom 0.32s var(--ease-out-expo) forwards;
+      animation-delay: 0.18s;
+    }
+
+    @keyframes flipTop {
+      from {
+        transform: rotateX(0deg);
+      }
+
+      to {
+        transform: rotateX(-90deg);
+      }
+    }
+
+    @keyframes flipBottom {
+      from {
+        transform: rotateX(90deg);
+      }
+
+      to {
+        transform: rotateX(0deg);
+      }
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --card-padding: 1.4rem;
+        --card-radius: 24px;
+        --glass-edge-size: 1px;
+      }
+
       .container {
-        width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: clamp(12px, 3vw, 20px);
+        max-width: 94vw;
       }
-      .card {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: clamp(20px, 5vw, 28px);
-        padding: clamp(18px, 4vw, 28px);
-        box-shadow: 0 10px 40px rgba(0, 147, 233, 0.2);
-        transition: transform 0.2s ease;
-      }
-      .card:active { transform: scale(0.98); }
-      .header {
-        text-align: left; padding: clamp(20px, 5vw, 32px) clamp(16px, 4vw, 28px); background: white;
-        display: flex; align-items: center; gap: clamp(16px, 4vw, 24px);
-      }
-      .icon-wrap {
-        width: clamp(60px, 15vw, 84px); height: clamp(60px, 15vw, 84px);
-        background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
-        border-radius: clamp(18px, 4vw, 26px);
-        display: flex; align-items: center; justify-content: center;
-        margin: 0;
-        box-shadow: 0 12px 32px rgba(0, 147, 233, 0.35);
-        flex-shrink: 0;
-      }
-      .icon-wrap span { font-size: clamp(32px, 8vw, 44px); }
-      .header-content { flex: 1; }
-      .header h1 { font-size: clamp(20px, 5vw, 26px); font-weight: 700; color: #1a202c; margin-bottom: 4px; line-height: 1.2; }
-      .header p { font-size: clamp(13px, 3.5vw, 15px); color: #718096; font-weight: 500; }
-      .input-card { padding: 0; overflow: hidden; }
-      .input-card textarea {
-        width: 100%; min-height: clamp(90px, 20vw, 120px); border: none;
-        padding: clamp(16px, 4vw, 24px); font-size: clamp(15px, 4vw, 18px);
-        font-family: inherit; resize: none; outline: none; color: #2d3748; background: transparent; line-height: 1.5;
-      }
-      .input-card textarea::placeholder { color: #a0aec0; }
-      .tags {
-        display: flex; gap: clamp(6px, 2vw, 10px);
-        padding: 0 clamp(12px, 3vw, 20px) clamp(14px, 3vw, 20px);
-        overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-      }
-      .tags::-webkit-scrollbar { display: none; }
-      .tag {
-        background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-        color: #00796b; padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 18px);
-        border-radius: 20px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
-        white-space: nowrap; cursor: pointer; border: 1px solid #80cbc4;
-        min-height: 44px; display: flex; align-items: center; transition: all 0.2s;
-      }
-      .tag:active { transform: scale(0.95); background: #80cbc4; }
-      .loc-card {
-        display: flex; align-items: center; gap: clamp(10px, 3vw, 16px);
-        padding: clamp(14px, 3.5vw, 22px) clamp(16px, 4vw, 24px);
-        cursor: pointer; min-height: 64px;
-      }
-      .loc-icon {
-        width: clamp(44px, 11vw, 56px); height: clamp(44px, 11vw, 56px);
-        border-radius: clamp(14px, 3.5vw, 18px); display: flex; align-items: center; justify-content: center;
-        font-size: clamp(22px, 5.5vw, 28px); flex-shrink: 0;
-      }
-      .loc-icon.loading { background: #fff3cd; }
-      .loc-icon.success { background: #d4edda; }
-      .loc-icon.error { background: #f8d7da; }
-      .loc-content { flex: 1; min-width: 0; }
-      .loc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .loc-title { font-size: clamp(15px, 4vw, 18px); font-weight: 600; color: #2d3748; }
-      .loc-status { font-size: clamp(12px, 3.2vw, 14px); color: #718096; margin-top: 3px; }
-      .loc-status.success { color: #28a745; }
-      .loc-status.error { color: #dc3545; }
-      .loc-status.disabled { color: #94a3b8; }
-      .loc-icon.disabled { background: #e2e8f0; }
-      .toggle {
-        position: relative; display: inline-flex; align-items: center;
-        width: 52px; height: 30px; flex-shrink: 0;
-      }
-      .toggle input { opacity: 0; width: 0; height: 0; }
-      .toggle-slider {
-        position: absolute; cursor: pointer; inset: 0;
-        background: #cbd5f5; border-radius: 999px; transition: background 0.2s;
-      }
-      .toggle-slider::before {
-        content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
-        background: white; border-radius: 50%; transition: transform 0.2s;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      }
-      .toggle input:checked + .toggle-slider { background: #38bdf8; }
-      .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
-      .btn-main {
-        background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); color: white; border: none;
-        padding: clamp(16px, 4vw, 22px); border-radius: clamp(16px, 4vw, 22px);
-        font-size: clamp(16px, 4.2vw, 20px); font-weight: 700; cursor: pointer;
-        display: flex; align-items: center; justify-content: center; gap: 10px;
-        box-shadow: 0 10px 30px rgba(0, 147, 233, 0.35); min-height: 56px; transition: all 0.2s;
-      }
-      .btn-main:active { transform: scale(0.98); }
-      .btn-main:disabled { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: none; cursor: not-allowed; }
-      .toast {
-        position: fixed; top: calc(20px + var(--sat)); left: 50%;
-        transform: translateX(-50%) translateY(-100px); background: white;
-        padding: clamp(12px, 3vw, 16px) clamp(20px, 5vw, 32px); border-radius: 16px;
-        font-size: clamp(14px, 3.5vw, 16px); font-weight: 600; color: #2d3748;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15); opacity: 0;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100;
-        max-width: calc(100vw - 40px);
-      }
-      .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-      #successView { display: none; }
-      .success-card { text-align: center; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 2px solid #28a745; }
-      .success-icon { font-size: clamp(56px, 14vw, 80px); margin-bottom: clamp(12px, 3vw, 20px); display: block; }
-      .success-card h2 { color: #155724; margin-bottom: 8px; font-size: clamp(20px, 5vw, 28px); }
-      .success-card p { color: #1e7e34; font-size: clamp(14px, 3.5vw, 16px); }
-      .owner-card { background: white; border: 2px solid #80D0C7; text-align: center; }
-      .owner-card.hidden { display: none; }
-      .owner-card h3 { color: #0093E9; margin-bottom: 8px; font-size: clamp(18px, 4.5vw, 22px); }
-      .owner-card p { color: #718096; margin-bottom: 16px; font-size: clamp(14px, 3.5vw, 16px); }
-      .map-links { display: flex; gap: clamp(8px, 2vw, 14px); flex-wrap: wrap; }
-      .map-btn {
-        flex: 1; min-width: 120px; padding: clamp(12px, 3vw, 16px); border-radius: clamp(12px, 3vw, 16px);
-        text-decoration: none; font-weight: 600; font-size: clamp(13px, 3.5vw, 15px);
-        text-align: center; min-height: 48px; display: flex; align-items: center; justify-content: center;
-      }
-      .map-btn.amap { background: #1890ff; color: white; }
-      .map-btn.apple { background: #1d1d1f; color: white; }
-      .action-card { display: flex; flex-direction: column; gap: clamp(10px, 2.5vw, 14px); }
-      .action-hint { text-align: center; font-size: clamp(13px, 3.5vw, 15px); color: #718096; margin-bottom: 4px; }
-      .btn-retry, .btn-phone {
-        color: white; border: none; padding: clamp(14px, 3.5vw, 18px); border-radius: clamp(14px, 3.5vw, 18px);
-        font-size: clamp(15px, 4vw, 17px); font-weight: 700; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; min-height: 52px; text-decoration: none;
-      }
-      .btn-retry { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3); }
-      .btn-retry:active { transform: scale(0.98); }
-      .btn-retry:disabled { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); box-shadow: none; cursor: not-allowed; }
-      .btn-phone { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3); }
-      .btn-phone:active { transform: scale(0.98); }
-      .btn-phone.disabled { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); box-shadow: none; cursor: not-allowed; pointer-events: none; }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-      .loading-text { animation: pulse 1.5s ease-in-out infinite; }
-      .modal-overlay {
-        position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex;
-        align-items: center; justify-content: center; z-index: 200; padding: 20px;
-        opacity: 0; visibility: hidden; transition: all 0.3s;
-      }
-      .modal-overlay.show { opacity: 1; visibility: visible; }
-      .modal-box {
-        background: white; border-radius: 20px; padding: clamp(24px, 6vw, 32px); max-width: 340px; width: 100%;
-        text-align: center; transform: scale(0.9); transition: transform 0.3s;
-      }
-      .modal-overlay.show .modal-box { transform: scale(1); }
-      .modal-icon { font-size: 48px; margin-bottom: 16px; }
-      .modal-title { font-size: 18px; font-weight: 700; color: #1a202c; margin-bottom: 8px; }
-      .modal-desc { font-size: 14px; color: #718096; margin-bottom: 24px; line-height: 1.5; }
-      .modal-buttons { display: flex; gap: 12px; }
-      .modal-btn {
-        flex: 1; padding: 14px 16px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;
-      }
-      .modal-btn:active { transform: scale(0.96); }
-      .modal-btn-primary { background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); color: white; }
-      .modal-btn-danger { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #ef4444; }
-      .countdown-container {
-        display: flex;
-        justify-content: center;
-        margin: 24px 0;
-        position: relative;
-      }
-      .flip-card {
-        background: #1a202c;
-        color: white;
-        font-size: clamp(60px, 15vw, 80px);
-        font-weight: 700;
-        line-height: 1;
-        padding: clamp(16px, 4vw, 24px) clamp(24px, 6vw, 32px);
-        border-radius: 12px;
-        min-width: 120px;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        position: relative;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        letter-spacing: 2px;
-        transform-style: preserve-3d;
-      }
-      .flip-card::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: rgba(0,0,0,0.4);
-        transform: translateY(-50%);
-      }
-      .flip-card.flip {
-        animation: flipDown 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
-      }
-      @keyframes flipDown {
-        0% { transform: rotateX(0deg); }
-        49% { transform: rotateX(-90deg); }
-        50% { transform: rotateX(90deg); }
-        100% { transform: rotateX(0deg); }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="toast" class="toast"></div>
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-fluid" aria-hidden="true"></div>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <div id="toast" class="toast"></div>
+
+  <div class="main-container">
     <div id="locationTipModal" class="modal-overlay">
       <div class="modal-box">
         <div class="modal-icon">📍</div>
         <div class="modal-title">位置信息说明</div>
-        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将 <span style="font-weight:bold; font-size:1.2em;"> 延迟 </span> 发送通知</div>
+        <div class="modal-desc">分享位置可让车主确认您在车旁<br>不分享将 <span style="font-weight:bold; font-size:1.2em;"> 延迟 </span> 发送通知
+        </div>
         <div class="modal-buttons">
-          <button class="modal-btn modal-btn-primary" onclick="hideModal('locationTipModal');">我知道了</button>
+          <button class="modal-btn spot-btn" onclick="hideModal('locationTipModal');"><span>我知道了</span></button>
         </div>
       </div>
     </div>
@@ -578,13 +1296,19 @@ function renderMainPage(origin) {
         <div class="modal-title">正在延迟发送</div>
         <div class="modal-desc">未提供位置信息，<br>将在倒计时结束后发送通知</div>
         <div class="countdown-container">
-          <div id="countdownNum" class="flip-card">30</div>
+          <div id="countdownNum" class="flip-card">
+            <span class="flip-half flip-top flip-static"><span class="flip-text">30</span></span>
+            <span class="flip-half flip-bottom flip-static"><span class="flip-text">30</span></span>
+            <span class="flip-half flip-top flip-anim"><span class="flip-text">30</span></span>
+            <span class="flip-half flip-bottom flip-anim"><span class="flip-text">30</span></span>
+          </div>
         </div>
         <div class="modal-buttons">
-          <button class="modal-btn modal-btn-danger" onclick="cancelDelay()">取消发送</button>
+          <button class="modal-btn modal-btn-danger spot-btn" onclick="cancelDelay()"><span>取消发送</span></button>
         </div>
       </div>
     </div>
+
     <div class="container" id="mainView">
       <div class="card header">
         <div class="icon-wrap"><span>🚗</span></div>
@@ -596,13 +1320,15 @@ function renderMainPage(origin) {
       <div class="card input-card">
         <textarea id="msgInput" placeholder="输入留言给车主...（可选）"></textarea>
         <div class="tags">
-          <div class="tag" onclick="addTag('您的车挡住我了')">🚧 挡路</div>
-          <div class="tag" onclick="addTag('临时停靠一下')">⏱️ 临停</div>
-          <div class="tag" onclick="addTag('电话打不通')">📞 没接</div>
-          <div class="tag" onclick="addTag('麻烦尽快')">🙏 加急</div>
+          <div class="tag spot-btn" onclick="addTag('您的车挡住我了')"><span>🚧 挡路</span></div>
+          <div class="tag spot-btn" onclick="addTag('临时停靠一下')"><span>⏱️ 临停</span></div>
+          <div class="tag spot-btn" onclick="addTag('电话打不通')"><span>📞 没接</span></div>
+          <div class="tag spot-btn" onclick="addTag('麻烦尽快')"><span>🙏 加急</span></div>
         </div>
       </div>
-      <div style="position: fixed; bottom: 10px; right: 10px; opacity: 0.3; font-size: 12px; color: #333; pointer-events: none;">v1.0.3</div>
+      <div
+        style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
+        v2.0.0.beta1</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -616,51 +1342,58 @@ function renderMainPage(origin) {
           <div id="locStatus" class="loc-status">等待获取...</div>
         </div>
       </div>
-      <div id="mapContainer" class="card" style="display:none; height: 200px; padding: 0; overflow: hidden; margin-top: -10px;"></div>
-      <button id="notifyBtn" class="card btn-main" onclick="sendNotify()">
+      <div id="mapContainer" class="card"
+        style="display:none; height: 200px; padding: 0; overflow: hidden; margin-top: -10px;"></div>
+      <button id="notifyBtn" class="btn-main spot-btn" onclick="sendNotify()">
         <span>🔔</span>
         <span>一键通知车主</span>
       </button>
     </div>
-    <div class="container" id="successView" style="display: none; flex-direction: column; align-items: center; justify-content: start; padding-top: 40px;">
+
+    <div class="container" id="successView"
+      style="display: none; flex-direction: column; align-items: center; justify-content: start; padding-top: 40px;">
       <div id="ownerFeedback" class="card owner-card hidden">
         <span style="font-size:56px; display:block; margin-bottom:16px">🎉</span>
         <h3>车主已收到通知</h3>
         <p>正在赶来，点击查看车主位置</p>
         <div id="ownerMapLinks" class="map-links" style="display:none">
-          <a id="ownerAmapLink" href="#" class="map-btn amap">🗺️ 高德地图</a>
-          <a id="ownerAppleLink" href="#" class="map-btn apple">🍎 Apple Maps</a>
+          <a id="ownerAmapLink" href="#" class="map-btn amap spot-btn"><span>🗺️ 高德地图</span></a>
+          <a id="ownerAppleLink" href="#" class="map-btn apple spot-btn"><span>🍎 Apple Maps</span></a>
         </div>
       </div>
-      
+
       <div id="waitingCard" class="card" style="text-align: center; margin-bottom: 15px;">
         <span style="font-size: 60px; display: block; margin-bottom: 20px;">✅</span>
-        <h1 style="color: #2d3748; margin-bottom: 10px;">已通知车主</h1>
-        <p id="waitingText" style="color: #718096; font-size: 16px;">正在等待车主回应...</p>
+        <h1 style="color: var(--text-primary); margin-bottom: 10px;">已通知车主</h1>
+        <p id="waitingText" style="color: var(--text-secondary); font-size: 16px;">正在等待车主回应...</p>
       </div>
 
       <div class="card action-card">
         <p id="actionHint" class="action-hint">车主没反应？试试其他方式</p>
-        <button id="retryBtn" class="btn-retry" onclick="retryNotify()">
+        <button id="retryBtn" class="btn-retry spot-btn" onclick="retryNotify()">
           <span>🔔</span>
           <span>再次通知</span>
         </button>
         ${phone ? `
-        <a id="phoneBtn" href="tel:${phone}" class="btn-phone">
+        <a id="phoneBtn" href="tel:${phone}" class="btn-phone spot-btn">
           <span>📞</span>
           <span>直接打电话</span>
         </a>
         ` : ''}
-        <div style="margin-top: 15px; text-align: center;">
-           <a href="javascript:location.reload()" style="color: #a0aec0; text-decoration: none; font-size: 14px;">返回首页</a>
+<div style="margin-top: 15px; text-align: center;">
+          <a href="javascript:location.reload()"
+            style="color: rgba(255,255,255,0.55); text-decoration: none; font-size: 14px;">返回首页</a>
         </div>
       </div>
     </div>
-    <!-- Add Leaflet CSS and JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script>
-      let userLocation = null;
+  </div>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+let userLocation = null;
       let checkTimer = null;
       let delayTimer = null;
       let retryCooldownTimer = null;
@@ -671,6 +1404,7 @@ function renderMainPage(origin) {
       const RETRY_COOLDOWN_SECONDS = 30;
       const CALL_COOLDOWN_SECONDS = 30;
       let countdownVal = 30;
+      let lastCountdownVal = null;
       let map = null;
       let marker = null;
 
@@ -926,6 +1660,7 @@ function renderMainPage(origin) {
       function startDelayCountdown() {
         showModal('delayModal');
         countdownVal = 30;
+        lastCountdownVal = null;
         updateDelayMsg();
         delayTimer = setInterval(() => {
           countdownVal--;
@@ -941,10 +1676,33 @@ function renderMainPage(origin) {
       function updateDelayMsg() {
          const el = document.getElementById('countdownNum');
          if (!el) return;
-         el.innerText = countdownVal.toString().padStart(2, '0');
-         el.classList.remove('flip');
-         void el.offsetWidth;
-         el.classList.add('flip');
+         const current = countdownVal.toString().padStart(2, '0');
+         if (lastCountdownVal === null) {
+           lastCountdownVal = countdownVal;
+         }
+         const prev = lastCountdownVal.toString().padStart(2, '0');
+
+         const topStatic = el.querySelector('.flip-top.flip-static .flip-text');
+         const bottomStatic = el.querySelector('.flip-bottom.flip-static .flip-text');
+         const topAnim = el.querySelector('.flip-top.flip-anim .flip-text');
+         const bottomAnim = el.querySelector('.flip-bottom.flip-anim .flip-text');
+
+         if (!topStatic || !bottomStatic || !topAnim || !bottomAnim) {
+           el.innerText = current;
+           return;
+         }
+
+         topStatic.textContent = current;
+         bottomStatic.textContent = current;
+         topAnim.textContent = prev;
+         bottomAnim.textContent = current;
+
+         if (prev !== current) {
+           el.classList.remove('flip');
+           void el.offsetWidth;
+           el.classList.add('flip');
+         }
+         lastCountdownVal = countdownVal;
       }
 
       function cancelDelay() {
@@ -1071,135 +1829,752 @@ function renderMainPage(origin) {
           btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
         }
       }
-    </script>
-  </body>
-  </html>
+
+// Spotlight tracking effect
+    (function () {
+      const buttons = Array.from(document.querySelectorAll('.spot-btn'));
+      const MAX_DIST = 110;
+      const SOURCE_RADIUS = 300;
+      let lastX = -10000;
+      let lastY = -10000;
+      let sourceX = -10000;
+      let sourceY = -10000;
+      let sourceIntensity = 0;
+      let targetSourceIntensity = 0;
+      let rafId = 0;
+
+      const resetSpot = (btn) => {
+        btn.style.setProperty('--bx', '-1000px');
+        btn.style.setProperty('--by', '-1000px');
+        btn.style.setProperty('--sx', '-1000px');
+        btn.style.setProperty('--sy', '-1000px');
+        btn.style.setProperty('--si', '0');
+        btn.style.setProperty('--border-alpha', '0');
+      };
+
+      const setSpot = (btn, x, y, strength) => {
+        const rect = btn.getBoundingClientRect();
+        const bx = x - rect.left;
+        const by = y - rect.top;
+        const si = Math.max(0, Math.min(1, strength));
+        btn.style.setProperty('--bx', bx + 'px');
+        btn.style.setProperty('--by', by + 'px');
+        btn.style.setProperty('--border-alpha', (0.04 + 0.22 * si).toFixed(3));
+      };
+
+      const updateAll = (x, y) => {
+        const currentSource = sourceIntensity;
+        buttons.forEach((btn) => {
+          const rect = btn.getBoundingClientRect();
+          const dx = Math.max(rect.left - x, 0, x - rect.right);
+          const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+          const dist = Math.hypot(dx, dy);
+          let borderAlpha = 0;
+
+          if (dist <= MAX_DIST) {
+            const strength = 1 - dist / MAX_DIST;
+            setSpot(btn, x, y, strength);
+            borderAlpha = Math.max(borderAlpha, 0.04 + 0.22 * strength);
+          } else {
+            resetSpot(btn);
+          }
+
+          if (currentSource > 0) {
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const sdist = Math.hypot(cx - sourceX, cy - sourceY);
+            const sStrength = Math.max(0, 1 - sdist / SOURCE_RADIUS) * currentSource;
+            const sBoost = Math.min(1, sStrength * 1.25);
+            if (sBoost > 0) {
+              btn.style.setProperty('--sx', (sourceX - rect.left) + 'px');
+              btn.style.setProperty('--sy', (sourceY - rect.top) + 'px');
+              btn.style.setProperty('--si', sBoost.toFixed(3));
+              borderAlpha = Math.max(borderAlpha, 0.08 + 0.28 * sBoost);
+            } else {
+              btn.style.setProperty('--sx', '-1000px');
+              btn.style.setProperty('--sy', '-1000px');
+              btn.style.setProperty('--si', '0');
+            }
+          } else {
+            btn.style.setProperty('--sx', '-1000px');
+            btn.style.setProperty('--sy', '-1000px');
+            btn.style.setProperty('--si', '0');
+          }
+          btn.style.setProperty('--border-alpha', borderAlpha.toFixed(3));
+        });
+      };
+
+      const tick = () => {
+        sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
+        if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
+          sourceIntensity = targetSourceIntensity;
+        }
+        if (lastX > -9999) {
+          updateAll(lastX, lastY);
+        }
+        if (Math.abs(targetSourceIntensity - sourceIntensity) >= 0.01) {
+          rafId = requestAnimationFrame(tick);
+        } else {
+          rafId = 0;
+        }
+      };
+
+      const resetAll = () => {
+        buttons.forEach(resetSpot);
+        sourceIntensity = 0;
+        targetSourceIntensity = 0;
+        sourceX = -10000;
+        sourceY = -10000;
+        lastX = -10000;
+        lastY = -10000;
+      };
+
+      document.addEventListener('pointermove', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        updateAll(lastX, lastY);
+      });
+
+      document.addEventListener('pointerout', (e) => {
+        if (!e.relatedTarget) resetAll();
+      });
+
+      document.addEventListener('pointerleave', resetAll);
+      document.addEventListener('mouseleave', resetAll);
+      document.addEventListener('pointercancel', resetAll);
+
+      window.addEventListener('blur', resetAll);
+      window.addEventListener('resize', () => {
+        if (lastX > -9999) updateAll(lastX, lastY);
+      });
+
+      buttons.forEach((btn) => {
+        resetSpot(btn);
+        btn.addEventListener('pointerenter', (e) => {
+          sourceX = e.clientX;
+          sourceY = e.clientY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        });
+        btn.addEventListener('pointerleave', () => {
+          targetSourceIntensity = 0;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        });
+        btn.addEventListener('pointerdown', (e) => {
+          btn.dataset.pressStart = String(performance.now());
+          const rect = btn.getBoundingClientRect();
+          const rx = e.clientX - rect.left;
+          const ry = e.clientY - rect.top;
+          const size = Math.max(rect.width, rect.height) * 2.2;
+          btn.style.setProperty('--rx', rx + 'px');
+          btn.style.setProperty('--ry', ry + 'px');
+          btn.style.setProperty('--rsize', size + 'px');
+          btn.style.setProperty('--ripple-ms', '180ms');
+          btn.classList.remove('ripple-on');
+          void btn.offsetWidth;
+          btn.classList.add('ripple-on');
+          if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
+        });
+        const endRipple = () => {
+          const start = Number(btn.dataset.pressStart || 0);
+          const elapsed = Math.max(0, performance.now() - start);
+          const outMs = Math.min(520, Math.max(160, Math.round(160 + elapsed * 0.45)));
+          btn.style.setProperty('--ripple-ms', outMs + 'ms');
+          if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
+          btn._rippleTimer = setTimeout(() => btn.classList.remove('ripple-on'), outMs);
+        };
+        btn.addEventListener('pointerup', endRipple);
+        btn.addEventListener('pointercancel', endRipple);
+      });
+    })();
+  </script>
+</body>
+
+</html>
   `;
   return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
 function renderOwnerPage() {
   const html = `
-  <!DOCTYPE html>
-  <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#667eea">
-    <title>确认挪车</title>
-    <style>
-      :root {
-        --sat: env(safe-area-inset-top, 0px);
-        --sar: env(safe-area-inset-right, 0px);
-        --sab: env(safe-area-inset-bottom, 0px);
-        --sal: env(safe-area-inset-left, 0px);
-      }
-      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-      html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-        background: linear-gradient(160deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        min-height: -webkit-fill-available;
-        padding: clamp(16px, 4vw, 24px);
-        padding-top: calc(clamp(16px, 4vw, 24px) + var(--sat));
-        padding-bottom: calc(clamp(16px, 4vw, 24px) + var(--sab));
-        padding-left: calc(clamp(16px, 4vw, 24px) + var(--sal));
-        padding-right: calc(clamp(16px, 4vw, 24px) + var(--sar));
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-      }
-      .card {
-        background: rgba(255,255,255,0.95); padding: clamp(24px, 6vw, 36px); border-radius: clamp(24px, 6vw, 32px);
-        text-align: center; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
-      }
-      .emoji { font-size: clamp(52px, 13vw, 72px); margin-bottom: clamp(16px, 4vw, 24px); display: block; }
-      h1 { font-size: clamp(22px, 5.5vw, 28px); color: #2d3748; margin-bottom: 8px; }
-      .subtitle { color: #718096; font-size: clamp(14px, 3.5vw, 16px); margin-bottom: clamp(20px, 5vw, 28px); }
-      .map-section {
-        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: clamp(14px, 3.5vw, 18px);
-        padding: clamp(14px, 3.5vw, 20px); margin-bottom: clamp(16px, 4vw, 24px); display: none;
-      }
-      .map-section.show { display: block; }
-      .map-section p { font-size: clamp(12px, 3.2vw, 14px); color: #6366f1; margin-bottom: 12px; font-weight: 600; }
-      .map-links { display: flex; gap: clamp(8px, 2vw, 12px); flex-wrap: wrap; }
-      .map-btn {
-        flex: 1; min-width: 110px; padding: clamp(12px, 3vw, 16px); border-radius: clamp(10px, 2.5vw, 14px);
-        text-decoration: none; font-weight: 600; font-size: clamp(13px, 3.5vw, 15px); text-align: center;
-        transition: transform 0.2s; min-height: 48px; display: flex; align-items: center; justify-content: center;
-      }
-      .map-btn:active { transform: scale(0.96); }
-      .map-btn.amap { background: #1890ff; color: white; }
-      .map-btn.apple { background: #1d1d1f; color: white; }
-      .btn {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; width: 100%;
-        padding: clamp(16px, 4vw, 20px); border-radius: clamp(14px, 3.5vw, 18px); font-size: clamp(16px, 4.2vw, 19px);
-        font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
-        display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; min-height: 56px;
-      }
-      .btn:active { transform: scale(0.98); }
-      .btn:disabled { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); box-shadow: none; cursor: not-allowed; }
-      .done-msg {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: clamp(14px, 3.5vw, 18px);
-        padding: clamp(16px, 4vw, 24px); margin-top: clamp(16px, 4vw, 24px); display: none;
-      }
-      .done-msg.show { display: block; }
-      .done-msg p { color: #065f46; font-weight: 600; font-size: clamp(15px, 4vw, 17px); }
-      
-      /* Toggle Styles */
-      .loc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding: 0 10px; }
-      .loc-title { font-size: 16px; font-weight: 600; color: #2d3748; }
-      .toggle {
-        position: relative; display: inline-flex; align-items: center;
-        width: 52px; height: 30px; flex-shrink: 0;
-      }
-      .toggle input { opacity: 0; width: 0; height: 0; }
-      .toggle-slider {
-        position: absolute; cursor: pointer; inset: 0;
-        background: #cbd5f5; border-radius: 999px; transition: background 0.2s;
-      }
-      .toggle-slider::before {
-        content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
-        background: white; border-radius: 50%; transition: transform 0.2s;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      }
-      .toggle input:checked + .toggle-slider { background: #38bdf8; }
-      .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <span class="emoji">👋</span>
-      <h1>收到挪车请求</h1>
-      <p class="subtitle">对方正在等待，请尽快确认</p>
-      <div id="mapArea" class="map-section">
-        <p>📍 对方位置</p>
-        <div class="map-links">
-          <a id="amapLink" href="#" class="map-btn amap">🗺️ 高德地图</a>
-          <a id="appleLink" href="#" class="map-btn apple">🍎 Apple Maps</a>
-        </div>
-      </div>
-      
-      <div class="loc-row">
-        <div class="loc-title">向对方发送我的位置</div>
-        <label class="toggle">
-          <input id="shareLocationToggle" type="checkbox" checked>
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
+<!DOCTYPE html>
+<html lang="zh-CN">
 
-      <button id="confirmBtn" class="btn" onclick="confirmMove()">
-        <span>🚀</span>
-        <span>我已知晓，正在前往</span>
-      </button>
-      <div id="doneMsg" class="done-msg">
-        <p>✅ 已通知对方您正在赶来！</p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#050505">
+  <title>确认挪车</title>
+  <style>
+    :root {
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      --card-max-width: 560px;
+      --card-padding: 1.8rem;
+      --card-radius: 28px;
+
+      --text-glow: 0 1px 3px rgba(0, 0, 0, 0.35);
+
+      --bg-base: #0a0a0c;
+      --glass-surface: rgba(20, 20, 24, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --glass-glow: rgba(255, 255, 255, 0.08);
+      --glass-blur: 12px;
+      --glass-edge-size: 1.5px;
+      --card-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.35);
+
+      --btn-spotlight-size: 120px;
+      --btn-source-size: 280px;
+      --btn-source-rgb: 255, 255, 255;
+      --btn-border-rgb: 255, 255, 255;
+      --btn-hover-glow: rgba(255, 255, 255, 0.12);
+
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.65);
+
+      --btn-bg: rgba(255, 255, 255, 0.06);
+      --btn-base-border: rgba(255, 255, 255, 0.08);
+      --btn-hover-bg: #ffffff;
+      --btn-hover-text: #000000;
+      --btn-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+      --toggle-bg: rgba(255, 255, 255, 0.12);
+      --toggle-border: rgba(255, 255, 255, 0.18);
+      --toggle-checked-bg: #22c55e;
+      --toggle-checked-border: #16a34a;
+      --toggle-knob: #ffffff;
+
+      --fluid-1: rgba(139, 92, 246, 0.35);
+      --fluid-2: rgba(236, 72, 153, 0.32);
+      --fluid-3: rgba(59, 130, 246, 0.30);
+      --fluid-4: rgba(251, 146, 60, 0.28);
+      --fluid-5: rgba(168, 85, 247, 0.26);
+      --fluid-6: rgba(14, 165, 233, 0.24);
+      --fluid-base-1: #0a0a14;
+      --fluid-base-2: #1a0a28;
+      --fluid-base-3: #0a1428;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-base: #f0f4ff;
+        --glass-surface: rgba(255, 255, 255, 0.45);
+        --glass-border: rgba(0, 0, 0, 0.08);
+        --glass-glow: rgba(255, 255, 255, 0.5);
+        --glass-blur: 10px;
+        --card-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12);
+
+        --btn-source-rgb: 60, 60, 70;
+        --btn-border-rgb: 80, 90, 110;
+        --btn-hover-glow: rgba(0, 0, 0, 0.04);
+
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-glow: 0 1px 2px rgba(0, 0, 0, 0.15);
+
+        --btn-bg: rgba(255, 255, 255, 0.65);
+        --btn-base-border: rgba(0, 0, 0, 0.1);
+        --btn-hover-bg: #18181b;
+        --btn-hover-text: #ffffff;
+        --btn-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+        --toggle-bg: rgba(15, 23, 42, 0.1);
+        --toggle-border: rgba(15, 23, 42, 0.2);
+
+        --fluid-1: rgba(217, 70, 239, 0.45);
+        --fluid-2: rgba(59, 130, 246, 0.40);
+        --fluid-3: rgba(251, 191, 36, 0.48);
+        --fluid-4: rgba(236, 72, 153, 0.42);
+        --fluid-5: rgba(139, 92, 246, 0.38);
+        --fluid-6: rgba(34, 197, 94, 0.35);
+        --fluid-base-1: #f8f0ff;
+        --fluid-base-2: #fff0f8;
+        --fluid-base-3: #fff7ed;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(160deg, var(--bg-base) 0%, #0f0f12 100%);
+      color: var(--text-primary);
+      text-shadow: var(--text-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 4vw, 24px);
+      padding-top: calc(clamp(16px, 4vw, 24px) + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(clamp(16px, 4vw, 24px) + env(safe-area-inset-bottom, 0px));
+      overflow-x: hidden;
+    }
+
+    @media (prefers-color-scheme: light) {
+      body {
+        background: linear-gradient(160deg, var(--bg-base) 0%, #d4dae6 100%);
+      }
+    }
+
+    /* Fluid Background */
+    .bg-fluid {
+      position: fixed;
+      inset: -25%;
+      z-index: -10;
+      background:
+        radial-gradient(40% 50% at 15% 20%, var(--fluid-1), transparent 70%),
+        radial-gradient(45% 55% at 85% 15%, var(--fluid-2), transparent 70%),
+        radial-gradient(50% 60% at 35% 85%, var(--fluid-3), transparent 70%),
+        radial-gradient(40% 50% at 80% 80%, var(--fluid-4), transparent 70%),
+        linear-gradient(120deg, var(--fluid-base-1) 0%, var(--fluid-base-2) 50%, var(--fluid-base-3) 100%);
+      opacity: 1;
+      animation: fluid-drift 18s ease-in-out infinite alternate, fluid-shift 28s ease-in-out infinite;
+      pointer-events: none;
+      filter: saturate(1.3) contrast(1.05) brightness(1.1);
+    }
+
+    .bg-fluid::before,
+    .bg-fluid::after {
+      content: "";
+      position: absolute;
+      inset: -30%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .bg-fluid::before {
+      background:
+        radial-gradient(55% 60% at 20% 30%, var(--fluid-5), transparent 70%),
+        radial-gradient(60% 65% at 75% 65%, var(--fluid-6), transparent 72%),
+        radial-gradient(45% 55% at 60% 15%, rgba(255, 255, 255, 0.08), transparent 70%);
+      opacity: 0.85;
+      filter: blur(3px);
+      animation: fluid-float 22s ease-in-out infinite;
+    }
+
+    .bg-fluid::after {
+      background:
+        radial-gradient(60% 70% at 30% 75%, rgba(139, 92, 246, 0.20), transparent 70%),
+        radial-gradient(50% 60% at 70% 35%, rgba(236, 72, 153, 0.18), transparent 70%),
+        radial-gradient(55% 65% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 75%);
+      opacity: 0.7;
+      filter: blur(8px);
+      animation: fluid-sway 30s ease-in-out infinite alternate;
+    }
+
+    .bg-noise {
+      position: fixed;
+      inset: 0;
+      z-index: -5;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px);
+      opacity: 0.12;
+      pointer-events: none;
+      mix-blend-mode: soft-light;
+    }
+
+    @keyframes fluid-drift {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate3d(-3%, 2.5%, 0) scale(1.08);
+      }
+
+      100% {
+        transform: translate3d(3%, -2%, 0) scale(1.05);
+      }
+    }
+
+    @keyframes fluid-float {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate3d(4%, -3%, 0) scale(1.10);
+      }
+
+      100% {
+        transform: translate3d(-3%, 2%, 0) scale(1.06);
+      }
+    }
+
+    @keyframes fluid-sway {
+      0% {
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      50% {
+        transform: translate3d(-4%, 3.5%, 0) scale(1.09);
+      }
+
+      100% {
+        transform: translate3d(3%, -2.5%, 0) scale(1.05);
+      }
+    }
+
+    @keyframes fluid-shift {
+      0% {
+        background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
+      }
+
+      50% {
+        background-position: 10% 5%, 90% 10%, 20% 90%, 75% 70%, 45% 55%;
+      }
+
+      100% {
+        background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
+      }
+    }
+
+    /* Glass Card */
+    .card {
+      background: var(--glass-surface);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      padding: clamp(24px, 6vw, 36px);
+      text-align: center;
+      width: 100%;
+      max-width: var(--card-max-width);
+      box-shadow:
+        var(--card-shadow),
+        inset 0 0 0 0.5px var(--glass-glow);
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Card edge highlight */
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: var(--glass-edge-size);
+      background: linear-gradient(180deg,
+          rgba(255, 255, 255, 0.12) 0%,
+          rgba(255, 255, 255, 0) 50%,
+          rgba(255, 255, 255, 0.04) 100%);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .emoji {
+      font-size: clamp(52px, 13vw, 72px);
+      margin-bottom: clamp(16px, 4vw, 24px);
+      display: block;
+    }
+
+    h1 {
+      font-size: clamp(22px, 5.5vw, 28px);
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: clamp(14px, 3.5vw, 16px);
+      margin-bottom: clamp(20px, 5vw, 28px);
+      line-height: 1.5;
+    }
+
+    /* Map section */
+    .map-section {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: none;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .map-section.show {
+      display: block;
+    }
+
+    .map-section p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .map-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .map-btn {
+      flex: 1;
+      min-width: 110px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+      text-align: center;
+      color: var(--text-primary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: transform 0.2s ease;
+    }
+
+    .map-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Toggle */
+    .loc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 0 10px;
+    }
+
+    .loc-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      width: 54px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--toggle-bg);
+      border-radius: 999px;
+      transition: background 0.25s, border 0.25s;
+      border: 1px solid var(--toggle-border);
+    }
+
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      height: 24px;
+      width: 24px;
+      left: 4px;
+      top: 50%;
+      background: var(--toggle-knob);
+      border-radius: 50%;
+      transform: translateY(-50%);
+      transition: transform 0.25s var(--ease-elastic);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle input:checked+.toggle-slider {
+      background: var(--toggle-checked-bg);
+      border-color: var(--toggle-checked-border);
+    }
+
+    .toggle input:checked+.toggle-slider::before {
+      transform: translate(22px, -50%);
+    }
+
+    /* Buttons */
+    .btn {
+      position: relative;
+      color: var(--text-primary);
+      width: 100%;
+      padding: 16px 0;
+      border-radius: var(--card-radius);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.3s var(--ease-out-expo);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Spot Button - with spotlight border effect */
+    .spot-btn {
+      --bx: -1000px;
+      --by: -1000px;
+      --sx: -1000px;
+      --sy: -1000px;
+      --si: 0;
+      --border-alpha: 0.06;
+      --rx: 50%;
+      --ry: 50%;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        radial-gradient(var(--btn-spotlight-size) circle at var(--bx) var(--by), var(--btn-hover-glow), transparent 100%),
+        var(--glass-surface);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25) brightness(1.03);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        var(--btn-shadow),
+        inset 0 0 0 0.5px var(--glass-glow);
+      transition: transform 0.3s var(--ease-out-expo);
+    }
+
+    .spot-btn>span {
+      position: relative;
+      z-index: 5;
+    }
+
+    /* Spotlight border - using mask technique */
+    .spot-btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background:
+        radial-gradient(var(--btn-spotlight-size) circle at var(--bx) var(--by), rgba(var(--btn-border-rgb), 0.85), transparent 100%),
+        radial-gradient(var(--btn-source-size) circle at var(--sx) var(--sy), rgba(var(--btn-source-rgb), calc(0.9 * var(--si))), transparent 80%),
+        linear-gradient(rgba(var(--btn-border-rgb), var(--border-alpha)), rgba(var(--btn-border-rgb), var(--border-alpha)));
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Ripple effect */
+    .spot-btn::after {
+      content: "";
+      position: absolute;
+      width: var(--rsize, 320px);
+      height: var(--rsize, 320px);
+      border-radius: 50%;
+      left: var(--rx);
+      top: var(--ry);
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: var(--btn-hover-bg);
+      transition: transform var(--ripple-ms, 280ms) var(--ease-out-expo), opacity var(--ripple-ms, 280ms) ease;
+    }
+
+    .spot-btn.ripple-on::after {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .spot-btn.ripple-on>span {
+      color: var(--btn-hover-text);
+    }
+
+    /* Done message */
+    .done-msg {
+      background: rgba(66, 200, 140, 0.18);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-top: 18px;
+      display: none;
+      border: 1px solid rgba(66, 200, 140, 0.25);
+    }
+
+    .done-msg.show {
+      display: block;
+    }
+
+    .done-msg p {
+      color: #bbf7d0;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --card-padding: 1.4rem;
+        --card-radius: 24px;
+        --glass-edge-size: 1px;
+      }
+
+      .card {
+        max-width: 92vw;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-fluid" aria-hidden="true"></div>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <div class="card">
+    <span class="emoji">👋</span>
+    <h1>收到挪车请求</h1>
+    <p class="subtitle">对方正在等待，请尽快确认</p>
+    <div id="mapArea" class="map-section">
+      <p>📍 对方位置</p>
+      <div class="map-links">
+        <a id="amapLink" href="#" class="map-btn amap spot-btn"><span>🗺️ 高德地图</span></a>
+        <a id="appleLink" href="#" class="map-btn apple spot-btn"><span>🍎 Apple Maps</span></a>
       </div>
     </div>
-    <script>
-      let ownerLocation = null;
+
+    <div class="loc-row">
+      <div class="loc-title">向对方发送我的位置</div>
+      <label class="toggle">
+        <input id="shareLocationToggle" type="checkbox" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <button id="confirmBtn" class="btn spot-btn" onclick="confirmMove()">
+      <span>🚀</span>
+      <span>我已知晓，正在前往</span>
+    </button>
+    <div id="doneMsg" class="done-msg">
+      <p>✅ 已通知对方您正在赶来！</p>
+    </div>
+  </div>
+  <script>
+let ownerLocation = null;
       window.onload = async () => {
         try {
           const res = await fetch('/api/get-location');
@@ -1253,9 +2628,168 @@ function renderOwnerPage() {
           btn.innerHTML = '<span>🚀</span><span>我已知晓，正在前往</span>';
         }
       }
-    </script>
-  </body>
-  </html>
+
+// Spotlight tracking effect
+    (function () {
+      const buttons = Array.from(document.querySelectorAll('.spot-btn'));
+      const MAX_DIST = 110;
+      const SOURCE_RADIUS = 300;
+      let lastX = -10000;
+      let lastY = -10000;
+      let sourceX = -10000;
+      let sourceY = -10000;
+      let sourceIntensity = 0;
+      let targetSourceIntensity = 0;
+      let rafId = 0;
+
+      const resetSpot = (btn) => {
+        btn.style.setProperty('--bx', '-1000px');
+        btn.style.setProperty('--by', '-1000px');
+        btn.style.setProperty('--sx', '-1000px');
+        btn.style.setProperty('--sy', '-1000px');
+        btn.style.setProperty('--si', '0');
+        btn.style.setProperty('--border-alpha', '0');
+      };
+
+      const setSpot = (btn, x, y, strength) => {
+        const rect = btn.getBoundingClientRect();
+        const bx = x - rect.left;
+        const by = y - rect.top;
+        const si = Math.max(0, Math.min(1, strength));
+        btn.style.setProperty('--bx', bx + 'px');
+        btn.style.setProperty('--by', by + 'px');
+        btn.style.setProperty('--border-alpha', (0.04 + 0.22 * si).toFixed(3));
+      };
+
+      const updateAll = (x, y) => {
+        const currentSource = sourceIntensity;
+        buttons.forEach((btn) => {
+          const rect = btn.getBoundingClientRect();
+          const dx = Math.max(rect.left - x, 0, x - rect.right);
+          const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+          const dist = Math.hypot(dx, dy);
+          let borderAlpha = 0;
+
+          if (dist <= MAX_DIST) {
+            const strength = 1 - dist / MAX_DIST;
+            setSpot(btn, x, y, strength);
+            borderAlpha = Math.max(borderAlpha, 0.04 + 0.22 * strength);
+          } else {
+            resetSpot(btn);
+          }
+
+          if (currentSource > 0) {
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const sdist = Math.hypot(cx - sourceX, cy - sourceY);
+            const sStrength = Math.max(0, 1 - sdist / SOURCE_RADIUS) * currentSource;
+            const sBoost = Math.min(1, sStrength * 1.25);
+            if (sBoost > 0) {
+              btn.style.setProperty('--sx', (sourceX - rect.left) + 'px');
+              btn.style.setProperty('--sy', (sourceY - rect.top) + 'px');
+              btn.style.setProperty('--si', sBoost.toFixed(3));
+              borderAlpha = Math.max(borderAlpha, 0.08 + 0.28 * sBoost);
+            } else {
+              btn.style.setProperty('--sx', '-1000px');
+              btn.style.setProperty('--sy', '-1000px');
+              btn.style.setProperty('--si', '0');
+            }
+          } else {
+            btn.style.setProperty('--sx', '-1000px');
+            btn.style.setProperty('--sy', '-1000px');
+            btn.style.setProperty('--si', '0');
+          }
+          btn.style.setProperty('--border-alpha', borderAlpha.toFixed(3));
+        });
+      };
+
+      const tick = () => {
+        sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
+        if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
+          sourceIntensity = targetSourceIntensity;
+        }
+        if (lastX > -9999) {
+          updateAll(lastX, lastY);
+        }
+        if (Math.abs(targetSourceIntensity - sourceIntensity) >= 0.01) {
+          rafId = requestAnimationFrame(tick);
+        } else {
+          rafId = 0;
+        }
+      };
+
+      const resetAll = () => {
+        buttons.forEach(resetSpot);
+        sourceIntensity = 0;
+        targetSourceIntensity = 0;
+        sourceX = -10000;
+        sourceY = -10000;
+        lastX = -10000;
+        lastY = -10000;
+      };
+
+      document.addEventListener('pointermove', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        updateAll(lastX, lastY);
+      });
+
+      document.addEventListener('pointerout', (e) => {
+        if (!e.relatedTarget) resetAll();
+      });
+
+      document.addEventListener('pointerleave', resetAll);
+      document.addEventListener('mouseleave', resetAll);
+      document.addEventListener('pointercancel', resetAll);
+
+      window.addEventListener('blur', resetAll);
+      window.addEventListener('resize', () => {
+        if (lastX > -9999) updateAll(lastX, lastY);
+      });
+
+      buttons.forEach((btn) => {
+        resetSpot(btn);
+        btn.addEventListener('pointerenter', (e) => {
+          sourceX = e.clientX;
+          sourceY = e.clientY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        });
+        btn.addEventListener('pointerleave', () => {
+          targetSourceIntensity = 0;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        });
+        btn.addEventListener('pointerdown', (e) => {
+          btn.dataset.pressStart = String(performance.now());
+          const rect = btn.getBoundingClientRect();
+          const rx = e.clientX - rect.left;
+          const ry = e.clientY - rect.top;
+          const size = Math.max(rect.width, rect.height) * 2.2;
+          btn.style.setProperty('--rx', rx + 'px');
+          btn.style.setProperty('--ry', ry + 'px');
+          btn.style.setProperty('--rsize', size + 'px');
+          btn.style.setProperty('--ripple-ms', '180ms');
+          btn.classList.remove('ripple-on');
+          void btn.offsetWidth;
+          btn.classList.add('ripple-on');
+          if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
+        });
+        const endRipple = () => {
+          const start = Number(btn.dataset.pressStart || 0);
+          const elapsed = Math.max(0, performance.now() - start);
+          const outMs = Math.min(520, Math.max(160, Math.round(160 + elapsed * 0.45)));
+          btn.style.setProperty('--ripple-ms', outMs + 'ms');
+          if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
+          btn._rippleTimer = setTimeout(() => btn.classList.remove('ripple-on'), outMs);
+        };
+        btn.addEventListener('pointerup', endRipple);
+        btn.addEventListener('pointercancel', endRipple);
+      });
+    })();
+  </script>
+</body>
+
+</html>
   `;
   return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
