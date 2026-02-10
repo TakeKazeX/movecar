@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 
@@ -41,6 +42,8 @@
       --text-primary: #ffffff;
       --text-secondary: rgba(255, 255, 255, 0.65);
       --accent: #ffffff;
+
+      --pill-radius: 999px;
 
       --btn-bg: rgba(255, 255, 255, 0.06);
       --btn-base-border: rgba(255, 255, 255, 0.08);
@@ -111,6 +114,8 @@
       box-sizing: border-box;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     body {
@@ -146,9 +151,9 @@
         radial-gradient(40% 50% at 80% 80%, var(--fluid-4), transparent 70%),
         linear-gradient(120deg, var(--fluid-base-1) 0%, var(--fluid-base-2) 50%, var(--fluid-base-3) 100%);
       opacity: 1;
-      animation: fluid-drift 18s ease-in-out infinite alternate, fluid-shift 28s ease-in-out infinite;
+      animation: fluid-drift 28s ease-in-out infinite alternate;
       pointer-events: none;
-      filter: saturate(1.3) contrast(1.05) brightness(1.1);
+      filter: saturate(1.15) brightness(1.05);
     }
 
     .bg-fluid::before,
@@ -166,8 +171,8 @@
         radial-gradient(60% 65% at 75% 65%, var(--fluid-6), transparent 72%),
         radial-gradient(45% 55% at 60% 15%, rgba(255, 255, 255, 0.08), transparent 70%);
       opacity: 0.85;
-      filter: blur(3px);
-      animation: fluid-float 22s ease-in-out infinite;
+      filter: blur(2px);
+      animation: fluid-float 30s ease-in-out infinite;
     }
 
     .bg-fluid::after {
@@ -176,8 +181,8 @@
         radial-gradient(50% 60% at 70% 35%, rgba(236, 72, 153, 0.18), transparent 70%),
         radial-gradient(55% 65% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 75%);
       opacity: 0.7;
-      filter: blur(8px);
-      animation: fluid-sway 30s ease-in-out infinite alternate;
+      filter: blur(6px);
+      animation: fluid-sway 36s ease-in-out infinite alternate;
     }
 
     .bg-noise {
@@ -248,6 +253,63 @@
       }
     }
 
+    .anim-paused .bg-fluid,
+    .anim-paused .bg-fluid::before,
+    .anim-paused .bg-fluid::after {
+      animation-play-state: paused;
+    }
+
+    @media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+      .bg-fluid,
+      .bg-fluid::before,
+      .bg-fluid::after {
+        animation: none !important;
+        filter: none !important;
+      }
+
+      .bg-noise {
+        opacity: 0.05;
+      }
+    }
+
+    .low-power .bg-fluid,
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      animation: none !important;
+      filter: none !important;
+    }
+
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      display: none;
+    }
+
+    .low-power .bg-noise {
+      opacity: 0.04;
+    }
+
+    .low-power .card,
+    .low-power .spot-btn {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .low-power .toggle-slider {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .low-power .toggle-slider {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .low-power .card,
+    .low-power .spot-btn {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
     .main-container {
       width: 100%;
       display: flex;
@@ -276,6 +338,7 @@
       border: 1px solid var(--glass-border);
       border-radius: var(--card-radius);
       padding: var(--card-padding);
+      width: 100%;
       box-shadow:
         var(--card-shadow),
         inset 0 0 0 0.5px var(--glass-glow);
@@ -375,7 +438,7 @@
       background: rgba(255, 255, 255, 0.08);
       color: var(--text-primary);
       padding: 10px 16px;
-      border-radius: 20px;
+      border-radius: var(--pill-radius);
       font-size: 14px;
       font-weight: 600;
       white-space: nowrap;
@@ -401,10 +464,7 @@
     }
 
     .loc-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      display: contents;
     }
 
     .loc-icon {
@@ -447,12 +507,19 @@
     .loc-content {
       flex: 1;
       min-width: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      align-items: center;
+      column-gap: 12px;
     }
 
     .loc-title {
       font-size: 16px;
       font-weight: 600;
       color: var(--text-primary);
+      grid-column: 1;
+      grid-row: 1;
     }
 
     .loc-status {
@@ -462,6 +529,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      grid-column: 1;
+      grid-row: 2;
     }
 
     /* Toggle */
@@ -472,6 +541,10 @@
       width: 52px;
       height: 30px;
       flex-shrink: 0;
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+      justify-self: end;
     }
 
     .toggle input {
@@ -484,10 +557,14 @@
       position: absolute;
       cursor: pointer;
       inset: 0;
-      background: var(--toggle-bg);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
       border: 1px solid var(--toggle-border);
       border-radius: 999px;
-      transition: background 0.25s, border 0.25s;
+      transition: background 0.25s, border 0.25s, box-shadow 0.25s;
+      backdrop-filter: blur(10px) saturate(1.6);
+      -webkit-backdrop-filter: blur(10px) saturate(1.6);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.45), inset 0 -1px 2px rgba(0, 0, 0, 0.12), 0 6px 14px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
     }
 
     .toggle-slider::before {
@@ -497,19 +574,34 @@
       width: 24px;
       left: 2px;
       top: 2px;
-      background: var(--toggle-knob);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 235, 235, 0.92));
       border-radius: 50%;
       transition: transform 0.25s var(--ease-elastic);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    }
+
+    .toggle-slider::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: 999px;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
+      opacity: 0.55;
+      pointer-events: none;
     }
 
     .toggle input:checked+.toggle-slider {
-      background: var(--toggle-checked-bg);
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
       border-color: var(--toggle-checked-border);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(16, 185, 129, 0.35);
     }
 
     .toggle input:checked+.toggle-slider::before {
       transform: translateX(22px);
+    }
+
+    .toggle input:checked+.toggle-slider::after {
+      opacity: 0.25;
     }
 
     /* Spot Button - with spotlight border effect */
@@ -592,7 +684,7 @@
       width: 100%;
       padding: clamp(16px, 4vw, 20px);
       border: none;
-      border-radius: var(--card-radius);
+      border-radius: var(--pill-radius);
       font-size: clamp(16px, 4vw, 18px);
       font-weight: 700;
       cursor: pointer;
@@ -629,7 +721,7 @@
       width: 100%;
       padding: 14px 20px;
       border: none;
-      border-radius: 16px;
+      border-radius: var(--pill-radius);
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
@@ -643,6 +735,7 @@
     }
 
     .btn-retry:disabled,
+    .btn-phone:disabled,
     .btn-phone.disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -658,7 +751,7 @@
     .map-btn {
       flex: 1;
       padding: 12px 16px;
-      border-radius: 12px;
+      border-radius: var(--pill-radius);
       text-decoration: none;
       font-weight: 600;
       font-size: 14px;
@@ -689,13 +782,48 @@
       margin-bottom: 8px;
     }
 
-    .owner-card p {
-      font-size: 14px;
+      .owner-card p {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .owner-msg {
+        margin-top: 10px;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .owner-card.hidden {
+        display: none;
+      }
+
+    .session-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .session-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .session-expire {
+      font-size: 12px;
       color: var(--text-secondary);
     }
 
-    .owner-card.hidden {
-      display: none;
+    .session-card strong {
+      color: var(--text-primary);
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
 
     /* Toast */
@@ -728,7 +856,7 @@
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(15, 23, 42, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -747,10 +875,8 @@
     }
 
     .modal-box {
-      background: var(--glass-surface);
-      backdrop-filter: blur(20px) saturate(1.3);
-      -webkit-backdrop-filter: blur(20px) saturate(1.3);
-      border: 1px solid var(--glass-border);
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 24px;
       padding: clamp(24px, 6vw, 32px);
       max-width: 340px;
@@ -758,7 +884,8 @@
       text-align: center;
       transform: scale(0.9);
       transition: transform 0.3s var(--ease-out-expo);
-      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
+      color: #0f172a;
     }
 
     .modal-overlay.show .modal-box {
@@ -773,13 +900,13 @@
     .modal-title {
       font-size: 18px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: #0f172a;
       margin-bottom: 8px;
     }
 
     .modal-desc {
       font-size: 14px;
-      color: var(--text-secondary);
+      color: #475569;
       margin-bottom: 24px;
       line-height: 1.6;
     }
@@ -792,13 +919,15 @@
     .modal-btn {
       flex: 1;
       padding: 14px 16px;
-      border-radius: 14px;
+      border-radius: var(--pill-radius);
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      border: none;
-      color: var(--text-primary);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #ffffff;
+      color: #0f172a;
       transition: transform 0.2s ease;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
     }
 
     .modal-btn:active {
@@ -806,65 +935,150 @@
     }
 
     .modal-btn-danger {
-      background: rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fecaca;
     }
 
-    /* Countdown */
+    .modal-box .spot-btn {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .modal-box .spot-btn::before {
+      display: none;
+    }
+
+    /* Countdown - New Implementation */
     .countdown-container {
       display: flex;
       justify-content: center;
       margin: 20px 0;
     }
 
-    .flip-card {
-      background: rgba(10, 10, 14, 0.9);
-      color: white;
-      font-size: clamp(60px, 15vw, 80px);
-      font-weight: 700;
-      line-height: 1;
-      padding: 16px 26px;
-      border-radius: 14px;
-      min-width: 120px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      position: relative;
-      letter-spacing: 2px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-      transform-style: preserve-3d;
+    .flip-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 2.5vw, 14px);
     }
 
+    .flip-card {
+      --fc-bg: #0a0a0e;
+      --fc-bg-top: #111116;
+      --fc-bg-btm: #0a0a0e;
+      position: relative;
+      width: clamp(64px, 16vw, 86px);
+      height: clamp(82px, 20vw, 110px);
+      border-radius: 16px;
+      perspective: 600px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: clamp(44px, 12vw, 68px);
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Four layers: upper bg, lower bg, top flap, bottom flap */
+    .fc-upper,
+    .fc-lower,
+    .fc-flap-top,
+    .fc-flap-btm {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 50%;
+      overflow: hidden;
+    }
+
+    /* Static background layers (z-index 1) */
+    .fc-upper {
+      top: 0;
+      z-index: 1;
+      background: var(--fc-bg-top);
+      border-radius: 14px 14px 0 0;
+    }
+
+    .fc-lower {
+      bottom: 0;
+      z-index: 1;
+      background: var(--fc-bg-btm);
+      border-radius: 0 0 14px 14px;
+    }
+
+    /* Animated flap layers (z-index 3) */
+    .fc-flap-top {
+      top: 0;
+      z-index: 3;
+      background: var(--fc-bg-top);
+      border-radius: 14px 14px 0 0;
+      transform-origin: bottom center;
+      backface-visibility: hidden;
+      /* transition set dynamically by JS */
+    }
+
+    .fc-flap-btm {
+      bottom: 0;
+      z-index: 3;
+      background: var(--fc-bg-btm);
+      border-radius: 0 0 14px 14px;
+      transform-origin: top center;
+      transform: rotateX(90deg);
+      backface-visibility: hidden;
+      /* transition set dynamically by JS */
+    }
+
+    /* Number text - 200% height trick clips to top or bottom half */
+    .fc-num {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 200%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .fc-upper .fc-num,
+    .fc-flap-top .fc-num {
+      top: 0;
+    }
+
+    .fc-lower .fc-num,
+    .fc-flap-btm .fc-num {
+      bottom: 0;
+    }
+
+    /* Center divider line */
     .flip-card::after {
       content: '';
       position: absolute;
       top: 50%;
+      left: 4px;
+      right: 4px;
+      height: 1.5px;
+      background: rgba(0, 0, 0, 0.6);
+      transform: translateY(-50%);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* Subtle inner shadow on top panel for depth */
+    .fc-upper::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
       left: 0;
       right: 0;
-      height: 2px;
-      background: rgba(0, 0, 0, 0.5);
-      transform: translateY(-50%);
-    }
-
-    .flip-card.flip {
-      animation: flipDown 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
-    }
-
-    @keyframes flipDown {
-      0% {
-        transform: rotateX(0deg);
-      }
-
-      49% {
-        transform: rotateX(-90deg);
-      }
-
-      50% {
-        transform: rotateX(90deg);
-      }
-
-      100% {
-        transform: rotateX(0deg);
-      }
+      height: 6px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.15));
+      pointer-events: none;
     }
 
     @media (max-width: 768px) {
@@ -905,7 +1119,20 @@
         <div class="modal-title">正在延迟发送</div>
         <div class="modal-desc">未提供位置信息，<br>将在倒计时结束后发送通知</div>
         <div class="countdown-container">
-          <div id="countdownNum" class="flip-card">30</div>
+          <div id="countdownNum" class="flip-wrap" aria-label="30">
+            <div class="flip-card" data-digit="tens" data-val="3">
+                <div class="fc-upper"><span class="fc-num">3</span></div>
+                <div class="fc-lower"><span class="fc-num">3</span></div>
+                <div class="fc-flap-top"><span class="fc-num">3</span></div>
+                <div class="fc-flap-btm"><span class="fc-num">3</span></div>
+            </div>
+            <div class="flip-card" data-digit="ones" data-val="0">
+                <div class="fc-upper"><span class="fc-num">0</span></div>
+                <div class="fc-lower"><span class="fc-num">0</span></div>
+                <div class="fc-flap-top"><span class="fc-num">0</span></div>
+                <div class="fc-flap-btm"><span class="fc-num">0</span></div>
+            </div>
+          </div>
         </div>
         <div class="modal-buttons">
           <button class="modal-btn modal-btn-danger spot-btn" onclick="cancelDelay()"><span>取消发送</span></button>
@@ -932,7 +1159,7 @@
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.0.0.beta</div>
+        v2.4.2</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -948,6 +1175,13 @@
       </div>
       <div id="mapContainer" class="card"
         style="display:none; height: 200px; padding: 0; overflow: hidden; margin-top: -10px;"></div>
+      <div id="sessionInfoUser" class="card session-card" style="display:none;">
+        <div class="session-row">
+          <span>会话 <strong id="sessionCodeUser">#------</strong></span>
+          <span id="sessionStatusUser">进行中</span>
+        </div>
+        <div id="sessionExpire" class="session-expire" style="display:none;"></div>
+      </div>
       <button id="notifyBtn" class="btn-main spot-btn" onclick="sendNotify()">
         <span>🔔</span>
         <span>一键通知车主</span>
@@ -960,6 +1194,7 @@
         <span style="font-size:56px; display:block; margin-bottom:16px">🎉</span>
         <h3>车主已收到通知</h3>
         <p>正在赶来，点击查看车主位置</p>
+        <p id="ownerMessage" class="owner-msg" style="display:none;"></p>
         <div id="ownerMapLinks" class="map-links" style="display:none">
           <a id="ownerAmapLink" href="#" class="map-btn amap spot-btn"><span>🗺️ 高德地图</span></a>
           <a id="ownerAppleLink" href="#" class="map-btn apple spot-btn"><span>🍎 Apple Maps</span></a>
@@ -969,7 +1204,7 @@
       <div id="waitingCard" class="card" style="text-align: center; margin-bottom: 15px;">
         <span style="font-size: 60px; display: block; margin-bottom: 20px;">✅</span>
         <h1 style="color: var(--text-primary); margin-bottom: 10px;">已通知车主</h1>
-        <p id="waitingText" style="color: var(--text-secondary); font-size: 16px;">正在等待车主回应...</p>
+        <p id="waitingText" style="color: var(--text-secondary); font-size: 16px;">正在等待车主回应...请不要离开此页面</p>
       </div>
 
       <div class="card action-card">
@@ -978,14 +1213,13 @@
           <span>🔔</span>
           <span>再次通知</span>
         </button>
-        <!-- PHONE_SECTION -->
-        <!--
-        <a id="phoneBtn" href="tel:13800138000" class="btn-phone spot-btn">
+        
+        <button id="phoneBtn" type="button" class="btn-phone spot-btn">
           <span>📞</span>
           <span>直接打电话</span>
-        </a>
-        -->
-        <div style="margin-top: 15px; text-align: center;">
+        </button>
+        
+<div style="margin-top: 15px; text-align: center;">
           <a href="javascript:location.reload()"
             style="color: rgba(255,255,255,0.55); text-decoration: none; font-size: 14px;">返回首页</a>
         </div>
@@ -998,9 +1232,869 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
-    // Spotlight tracking effect
+const API_BASE = '/api';
+const SESSION_PATH_ID = '';
+const SESSION_VIEW_TTL_MS = 600000;
+const PREVIEW_MODE = true;
+const PREVIEW_PHONE = '13800138000';
+const PREVIEW_OWNER_MESSAGE = '马上到';
+const PREVIEW_OWNER_COORDS = { lat: 31.2304, lng: 121.4737 };
+
+(function setupPreviewMock() {
+  const state = {
+    sessionId: null,
+    sessionStatus: null,
+    sessionCompletedAt: null,
+    ownerLocation: null,
+    ownerMessage: '',
+    createdAt: null,
+    confirmTimer: null
+  };
+
+  const buildMapLinks = (lat, lng) => ({
+    amapUrl: 'https://uri.amap.com/marker?position=' + lng + ',' + lat + '&name=位置',
+    appleUrl: 'https://maps.apple.com/?ll=' + lat + ',' + lng + '&q=位置'
+  });
+
+  const buildOwnerLocation = () => Object.assign({
+    lat: PREVIEW_OWNER_COORDS.lat,
+    lng: PREVIEW_OWNER_COORDS.lng,
+    timestamp: Date.now()
+  }, buildMapLinks(PREVIEW_OWNER_COORDS.lat, PREVIEW_OWNER_COORDS.lng));
+
+  const ensureOwnerArriving = () => {
+    if (state.confirmTimer) clearTimeout(state.confirmTimer);
+    state.confirmTimer = setTimeout(() => {
+      state.sessionStatus = 'arriving';
+      state.ownerLocation = buildOwnerLocation();
+      state.ownerMessage = PREVIEW_OWNER_MESSAGE;
+    }, 4500);
+  };
+
+  const makeSessionId = () => Math.random().toString(16).slice(2, 8).toUpperCase();
+  const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const parseBody = async (init) => {
+    if (!init || !init.body) return {};
+    try { return JSON.parse(init.body); } catch { return {}; }
+  };
+
+  const handleNotify = async (init) => {
+    const body = await parseBody(init);
+    const reuse = body.sessionId && state.sessionId && body.sessionId == state.sessionId && state.sessionStatus !== 'closed';
+    if (!reuse) {
+      state.sessionId = makeSessionId();
+      state.sessionStatus = 'active';
+      state.sessionCompletedAt = null;
+      state.ownerLocation = null;
+      state.ownerMessage = '';
+      state.createdAt = Date.now();
+    }
+    ensureOwnerArriving();
+    return json({ success: true, sessionId: state.sessionId });
+  };
+
+  const buildStatus = () => {
+    if (!state.sessionId) {
+      return { status: 'waiting', ownerLocation: null, sessionId: null, sessionStatus: null, sessionCompletedAt: null };
+    }
+    const status = state.sessionStatus === 'arriving' ? 'arriving' : (state.sessionStatus === 'closed' ? 'closed' : 'waiting');
+    return {
+      status,
+      ownerLocation: state.ownerLocation,
+      ownerMessage: state.ownerMessage || null,
+      sessionId: state.sessionId,
+      sessionStatus: state.sessionStatus,
+      sessionCompletedAt: state.sessionStatus === 'closed' ? state.sessionCompletedAt : null
+    };
+  };
+
+  const handleGetSession = () => json({
+    sessionId: state.sessionId,
+    sessionStatus: state.sessionStatus,
+    sessionCompletedAt: state.sessionStatus === 'closed' ? state.sessionCompletedAt : null
+  });
+
+  const handleGetPhone = () => json({ success: true, phone: PREVIEW_PHONE });
+
+  const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+  window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/') === -1) {
+      if (originalFetch) return originalFetch(input, init);
+      return json({ error: 'NO_FETCH' }, 500);
+    }
+    if (url.indexOf('/notify') !== -1) return handleNotify(init);
+    if (url.indexOf('/check-status') !== -1) return json(buildStatus());
+    if (url.indexOf('/get-session') !== -1) return handleGetSession();
+    if (url.indexOf('/get-phone') !== -1) return handleGetPhone();
+    return json({ error: 'NOT_FOUND' }, 404);
+  };
+
+  const mockGeo = { latitude: PREVIEW_OWNER_COORDS.lat, longitude: PREVIEW_OWNER_COORDS.lng, accuracy: 15 };
+  if (!navigator.geolocation) navigator.geolocation = {};
+  navigator.geolocation.getCurrentPosition = (success, error) => {
+    setTimeout(() => {
+      success({ coords: mockGeo });
+    }, 450);
+  };
+})();
+
+let userLocation = null;
+      let checkTimer = null;
+      let delayTimer = null;
+      let retryCooldownTimer = null;
+      let phoneCooldownTimer = null;
+      let retryReadyAt = 0;
+      let phoneReadyAt = null;
+      let phoneDefaultHtml = '';
+      let retryCooldownSeconds = 30;
+      let callCooldownSeconds = 30;
+      let ownerConfirmed = false;
+      let currentSessionId = null;
+      let currentSessionStatus = null;
+      let currentSessionCompletedAt = null;
+      let countdownVal = 30;
+      let lastCountdownVal = null;
+      let map = null;
+      let marker = null;
+
+      // WGS-84 to GCJ-02 function used in client side for map display
+      function wgs84ToGcj02Client(lat, lng) {
+        const a = 6378245.0;
+        const ee = 0.00669342162296594323;
+        if (outOfChina(lat, lng)) return { lat, lng };
+        let dLat = transformLat(lng - 105.0, lat - 35.0);
+        let dLng = transformLng(lng - 105.0, lat - 35.0);
+        const radLat = lat / 180.0 * Math.PI;
+        let magic = Math.sin(radLat);
+        magic = 1 - ee * magic * magic;
+        const sqrtMagic = Math.sqrt(magic);
+        dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+        return { lat: lat + dLat, lng: lng + dLng };
+      }
+      function outOfChina(lat, lng) {
+        return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+      }
+      function transformLat(x, y) {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+        return ret;
+      }
+      function transformLng(x, y) {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+        return ret;
+      }
+
+      window.onload = () => {
+        const toggle = document.getElementById('shareLocationToggle');
+        toggle.addEventListener('change', handleLocationToggle);
+        initActionControls();
+        refreshSessionInfo();
+        if (SESSION_PATH_ID) {
+          currentSessionId = SESSION_PATH_ID;
+        }
+        if (toggle.checked) {
+          requestLocation();
+        } else {
+          disableLocationSharing();
+        }
+        const sessionCard = document.getElementById('sessionInfoUser');
+        if (sessionCard) {
+          sessionCard.addEventListener('click', () => resumeSession());
+        }
+      };
+      let idleKick = null;
+      function setupPowerMode() {
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const saveData = navigator.connection && navigator.connection.saveData;
+        const lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+        const lowPower = !!(prefersReduced || saveData || lowMem);
+        document.body.classList.toggle('low-power', lowPower);
+      }
+      function setupIdlePause() {
+        const IDLE_MS = 4500;
+        let timer = 0;
+        const kick = () => {
+          if (!document.hidden) {
+            document.body.classList.remove('anim-paused');
+          }
+          if (timer) clearTimeout(timer);
+          if (!document.hidden) {
+            timer = setTimeout(() => {
+              if (!document.hidden) document.body.classList.add('anim-paused');
+            }, IDLE_MS);
+          }
+        };
+        idleKick = kick;
+        ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((evt) => {
+          window.addEventListener(evt, kick, { passive: true });
+        });
+        kick();
+      }
+      setupPowerMode();
+      setupIdlePause();
+      if (window.matchMedia) {
+        const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (motionQuery.addEventListener) motionQuery.addEventListener('change', setupPowerMode);
+        else if (motionQuery.addListener) motionQuery.addListener(setupPowerMode);
+      }
+      if (navigator.connection && navigator.connection.addEventListener) {
+        navigator.connection.addEventListener('change', setupPowerMode);
+      }
+      document.addEventListener('visibilitychange', () => {
+        document.body.classList.toggle('anim-paused', document.hidden);
+        if (!document.hidden && idleKick) idleKick();
+      });
+      function initActionControls() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (phoneBtn) {
+          phoneDefaultHtml = phoneBtn.innerHTML;
+          disablePhoneUntilRetry();
+          phoneBtn.addEventListener('click', (e) => {
+            if (!isPhoneReady()) {
+              e.preventDefault();
+              if (phoneReadyAt === null) {
+                showToast('⏳ 请先再次提醒后再拨打电话');
+              } else {
+                const remaining = Math.max(0, Math.ceil((phoneReadyAt - Date.now()) / 1000));
+                showToast('⏳ 还需等待 ' + remaining + 's 再拨打电话');
+              }
+              return;
+            }
+            requestPhoneAndCall();
+          });
+        }
+      }
+      function setActionHint(text) {
+        const el = document.getElementById('actionHint');
+        if (el && text) el.innerText = text;
+      }
+      function formatSessionStatus(raw) {
+        if (raw === 'arriving') return '车主正在赶来';
+        if (raw === 'closed' || raw === 'confirmed') return '已结束挪车会话';
+        return '进行中';
+      }
+      function formatExpireText(ts) {
+        const date = new Date(ts);
+        const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return '销毁时间 ' + time;
+      }
+      function applySessionInfo(data) {
+        const info = document.getElementById('sessionInfoUser');
+        const code = document.getElementById('sessionCodeUser');
+        const status = document.getElementById('sessionStatusUser');
+        const expire = document.getElementById('sessionExpire');
+        currentSessionId = data && data.sessionId ? data.sessionId : null;
+        currentSessionStatus = data && data.sessionStatus ? data.sessionStatus : null;
+        currentSessionCompletedAt = data && data.sessionCompletedAt ? Number(data.sessionCompletedAt) : null;
+        if (currentSessionId) {
+          if (code) code.innerText = '#' + currentSessionId;
+          if (status) status.innerText = formatSessionStatus(currentSessionStatus);
+        if (currentSessionCompletedAt && (currentSessionStatus === 'closed' || currentSessionStatus === 'confirmed')) {
+          if (expire) {
+            expire.innerText = formatExpireText(currentSessionCompletedAt + SESSION_VIEW_TTL_MS);
+            expire.style.display = 'block';
+          }
+        } else if (expire) {
+          expire.style.display = 'none';
+        }
+          if (info) info.style.display = 'flex';
+        } else if (info) {
+          info.style.display = 'none';
+        }
+      }
+      function resumeSession() {
+        if (!currentSessionId) return;
+        const mainView = document.getElementById('mainView');
+        const successView = document.getElementById('successView');
+        if (mainView) mainView.style.display = 'none';
+        if (successView) successView.style.display = 'flex';
+        history.replaceState(null, '', '/' + currentSessionId);
+        startPolling();
+        syncStatusOnce();
+      }
+      async function syncStatusOnce() {
+        try {
+          const res = await fetch(API_BASE + '/check-status');
+          const data = await res.json();
+          handleStatusResponse(data);
+        } catch (e) {}
+      }
+      function handleStatusResponse(data) {
+        if (data && (data.sessionId || data.sessionStatus || data.sessionCompletedAt)) {
+          applySessionInfo(data);
+        }
+        const retryBtn = document.getElementById('retryBtn');
+        const phoneBtn = document.getElementById('phoneBtn');
+        const ownerCard = document.getElementById('ownerFeedback');
+        const ownerMsg = document.getElementById('ownerMessage');
+        if (data.status === 'arriving') {
+          if (ownerCard) ownerCard.classList.remove('hidden');
+          if (ownerMsg) {
+            if (data.ownerMessage) {
+              ownerMsg.innerText = '车主留言：' + data.ownerMessage;
+              ownerMsg.style.display = 'block';
+            } else {
+              ownerMsg.style.display = 'none';
+            }
+          }
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = 'none';
+          if (data.ownerLocation && data.ownerLocation.amapUrl) {
+            const mapLinks = document.getElementById('ownerMapLinks');
+            if (mapLinks) mapLinks.style.display = 'flex';
+            const amapLink = document.getElementById('ownerAmapLink');
+            if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
+            const appleLink = document.getElementById('ownerAppleLink');
+            if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
+          }
+          setActionHint('车主正在赶来，可继续提醒');
+          if (retryBtn && retryBtn.disabled && retryBtn.innerText.includes('会话已')) {
+            retryBtn.disabled = false;
+            retryBtn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+          }
+          if (phoneBtn && phoneBtn.disabled && phoneBtn.innerText.includes('会话已')) {
+            disablePhoneUntilRetry();
+          }
+        } else if (data.status === 'confirmed') {
+          const fb = document.getElementById('ownerFeedback');
+          if (fb) fb.classList.remove('hidden');
+          if (ownerMsg) {
+            if (data.ownerMessage) {
+              ownerMsg.innerText = '车主留言：' + data.ownerMessage;
+              ownerMsg.style.display = 'block';
+            } else {
+              ownerMsg.style.display = 'none';
+            }
+          }
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = 'none';
+          const sessionStatus = document.getElementById('sessionStatusUser');
+          if (sessionStatus) sessionStatus.innerText = '已结束挪车会话';
+          if (data.ownerLocation && data.ownerLocation.amapUrl) {
+            const mapLinks = document.getElementById('ownerMapLinks');
+            if (mapLinks) mapLinks.style.display = 'flex';
+            const amapLink = document.getElementById('ownerAmapLink');
+            if (amapLink) amapLink.href = data.ownerLocation.amapUrl;
+            const appleLink = document.getElementById('ownerAppleLink');
+            if (appleLink) appleLink.href = data.ownerLocation.appleUrl;
+          }
+          if (retryBtn) {
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = '<span>✅</span><span>会话已完成</span>';
+          }
+          if (phoneBtn) {
+            phoneBtn.disabled = true;
+            phoneBtn.classList.add('disabled');
+            phoneBtn.innerHTML = '<span>📞</span><span>会话已完成</span>';
+          }
+          setActionHint('会话已完成，需重新发起通知');
+        } else if (data.status === 'closed') {
+          if (ownerCard) ownerCard.classList.add('hidden');
+          if (ownerMsg) ownerMsg.style.display = 'none';
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = 'none';
+          const sessionStatus = document.getElementById('sessionStatusUser');
+          if (sessionStatus) sessionStatus.innerText = '已结束挪车会话';
+          if (retryBtn) {
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = '<span>✅</span><span>会话已结束</span>';
+          }
+          if (phoneBtn) {
+            phoneBtn.disabled = true;
+            phoneBtn.classList.add('disabled');
+            phoneBtn.innerHTML = '<span>📞</span><span>会话已结束</span>';
+          }
+          setActionHint('会话已结束，需重新发起通知');
+        } else {
+          if (ownerCard) ownerCard.classList.add('hidden');
+          if (ownerMsg) ownerMsg.style.display = 'none';
+          const waitingCard = document.getElementById('waitingCard');
+          if (waitingCard) waitingCard.style.display = '';
+          if (retryBtn && retryBtn.disabled && retryBtn.innerText.includes('会话已')) {
+            retryBtn.disabled = false;
+            retryBtn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+          }
+          if (phoneBtn && phoneBtn.disabled && phoneBtn.innerText.includes('会话已')) {
+            disablePhoneUntilRetry();
+          }
+        }
+      }
+      async function refreshSessionInfo() {
+        try {
+          const res = await fetch(API_BASE + '/get-session');
+          const data = await res.json();
+          applySessionInfo(data);
+        } catch (e) {}
+      }
+      function updateActionHint() {
+        const now = Date.now();
+        if (phoneReadyAt !== null && now < phoneReadyAt) {
+          const remaining = Math.max(0, Math.ceil((phoneReadyAt - now) / 1000));
+          setActionHint('再次提醒已发送，' + remaining + 's 后可拨打电话');
+          return;
+        }
+        if (now < retryReadyAt) {
+          const remaining = Math.max(0, Math.ceil((retryReadyAt - now) / 1000));
+          setActionHint('距离下次提醒还有 ' + remaining + 's');
+          return;
+        }
+        setActionHint('车主没反应？试试其他方式');
+      }
+      function startRetryCooldown(seconds) {
+        const btn = document.getElementById('retryBtn');
+        if (!btn) return;
+        if (retryCooldownTimer) clearInterval(retryCooldownTimer);
+        retryReadyAt = Date.now() + seconds * 1000;
+        btn.disabled = true;
+        updateRetryCountdown();
+        retryCooldownTimer = setInterval(updateRetryCountdown, 1000);
+      }
+      function updateRetryCountdown() {
+        const btn = document.getElementById('retryBtn');
+        if (!btn) return;
+        const remaining = Math.max(0, Math.ceil((retryReadyAt - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(retryCooldownTimer);
+          retryCooldownTimer = null;
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+          updateActionHint();
+          return;
+        }
+        btn.innerHTML = '<span>⏳</span><span>' + remaining + 's 后可再次提醒</span>';
+        updateActionHint();
+      }
+      function disablePhoneUntilRetry() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn) return;
+        phoneReadyAt = null;
+        phoneBtn.disabled = true;
+        phoneBtn.classList.add('disabled');
+        phoneBtn.innerHTML = '<span>📞</span><span>再次提醒后可拨打</span>';
+      }
+      function startPhoneCooldown(seconds) {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn) return;
+        if (phoneCooldownTimer) clearInterval(phoneCooldownTimer);
+        phoneReadyAt = Date.now() + seconds * 1000;
+        phoneBtn.disabled = true;
+        phoneBtn.classList.add('disabled');
+        updatePhoneCountdown();
+        phoneCooldownTimer = setInterval(updatePhoneCountdown, 1000);
+      }
+      function updatePhoneCountdown() {
+        const phoneBtn = document.getElementById('phoneBtn');
+        if (!phoneBtn || phoneReadyAt === null) return;
+        const remaining = Math.max(0, Math.ceil((phoneReadyAt - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(phoneCooldownTimer);
+          phoneCooldownTimer = null;
+          phoneBtn.classList.remove('disabled');
+          phoneBtn.disabled = false;
+          phoneBtn.innerHTML = phoneDefaultHtml || '<span>📞</span><span>直接打电话</span>';
+          phoneReadyAt = Date.now();
+          updateActionHint();
+          return;
+        }
+        phoneBtn.innerHTML = '<span>⏳</span><span>' + remaining + 's 后可拨打</span>';
+        updateActionHint();
+      }
+      function isPhoneReady() {
+        if (phoneReadyAt === null) return false;
+        return Date.now() >= phoneReadyAt;
+      }
+      async function requestPhoneAndCall() {
+        try {
+          const res = await fetch(API_BASE + '/get-phone', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.phone) {
+            throw new Error(data.error || 'NO_PHONE');
+          }
+          window.location.href = 'tel:' + data.phone;
+        } catch (e) {
+          console.error(e);
+          showToast('❌ 获取电话失败');
+        }
+      }
+      function showModal(id) { document.getElementById(id).classList.add('show'); }
+      function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+      function requestLocation() {
+        const toggle = document.getElementById('shareLocationToggle');
+        if (!toggle.checked) return;
+        const icon = document.getElementById('locIcon');
+        const txt = document.getElementById('locStatus');
+        icon.className = 'loc-icon loading';
+        txt.className = 'loc-status';
+        txt.innerText = '正在获取定位...';
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+              icon.className = 'loc-icon success';
+              txt.className = 'loc-status success';
+              txt.innerText = '已获取位置 ✓';
+              showMap(userLocation.lat, userLocation.lng);
+            },
+            (err) => {
+              icon.className = 'loc-icon error';
+              txt.className = 'loc-status error';
+              txt.innerText = '位置获取失败，刷新页面可重试';
+              hideMap();
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        } else {
+          icon.className = 'loc-icon error';
+          txt.className = 'loc-status error';
+          txt.innerText = '浏览器不支持定位';
+          hideMap();
+        }
+      }
+      
+      function showMap(lat, lng) {
+        const container = document.getElementById('mapContainer');
+        if (!container) return; // Prevention
+        container.style.display = 'block';
+        
+        // Convert WGS84 (GPS) to GCJ02 (Amap/Chinese standard)
+        const gcj = wgs84ToGcj02Client(lat, lng);
+        const center = [gcj.lat, gcj.lng];
+
+        if (!map) {
+          map = L.map('mapContainer', {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: false,
+            touchZoom: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false
+          }).setView(center, 16);
+          
+          L.tileLayer('http://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            minZoom: 1,
+            maxZoom: 19
+          }).addTo(map);
+          
+          const icon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="font-size: 30px;">📍</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+          marker = L.marker(center, {icon: icon}).addTo(map);
+        } else {
+          map.setView(center, 16);
+          marker.setLatLng(center);
+        }
+        if (map) {
+          map.invalidateSize();
+        }
+      }
+
+      function hideMap() {
+        const container = document.getElementById('mapContainer');
+        if (container) container.style.display = 'none';
+      }
+
+      function addTag(text) { document.getElementById('msgInput').value = text; }
+      function handleLocationToggle(event) {
+        if (event.target.checked) {
+          requestLocation();
+        } else {
+          disableLocationSharing();
+          showModal('locationTipModal');
+        }
+      }
+      function disableLocationSharing() {
+        userLocation = null;
+        const icon = document.getElementById('locIcon');
+        const txt = document.getElementById('locStatus');
+        icon.className = 'loc-icon disabled';
+        txt.className = 'loc-status disabled';
+        txt.innerText = '已关闭位置共享，将在延迟后发送挪车信息';
+        hideMap();
+      }
+      async function sendMeowLocal(request) {
+        if (!request || !request.url) {
+          throw new Error('MeoW 本地请求缺少目标地址');
+        }
+        const res = await fetch(request.url, {
+          method: 'POST',
+          headers: request.headers || { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(request.body || {})
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error('MeoW 本地发送失败 (' + res.status + '): ' + text + ' ');
+        }
+        return res;
+      }
+      function startDelayCountdown() {
+        showModal('delayModal');
+        countdownVal = 30;
+        lastCountdownVal = null;
+        updateDelayMsg();
+        delayTimer = setInterval(() => {
+          countdownVal--;
+          updateDelayMsg();
+          if (countdownVal <= 0) {
+             clearInterval(delayTimer);
+             hideModal('delayModal');
+             doSendNotify(null);
+          }
+        }, 1000);
+      }
+
+      function updateDelayMsg() {
+         const el = document.getElementById('countdownNum');
+         if (!el) return;
+         const current = countdownVal.toString().padStart(2, '0');
+
+         if (lastCountdownVal === null) {
+           // Initialization / Reset
+           lastCountdownVal = current;
+           setFlipDisplay(current);
+           return;
+         }
+
+         const cards = el.querySelectorAll('.flip-card');
+         if (!cards || cards.length < 2) {
+           el.innerText = current;
+           return;
+         }
+
+         // Animate to new digits
+         updateFlipCard(cards[0], current[0]);
+         updateFlipCard(cards[1], current[1]);
+         lastCountdownVal = current;
+      }
+
+      function setFlipDisplay(strVal) {
+          const el = document.getElementById('countdownNum');
+          if (!el) return;
+          const str = String(strVal).padStart(2, '0');
+          el.setAttribute('aria-label', str);
+
+          el.querySelectorAll('.flip-card').forEach((card, i) => {
+              const d = str[i];
+              card.dataset.val = d;
+              card.querySelectorAll('.fc-num').forEach(n => n.textContent = d);
+              // Reset flaps to idle
+              const ft = card.querySelector('.fc-flap-top');
+              const fb = card.querySelector('.fc-flap-btm');
+              if (ft) { ft.style.transition = 'none'; ft.style.transform = 'rotateX(0)'; }
+              if (fb) { fb.style.transition = 'none'; fb.style.transform = 'rotateX(90deg)'; }
+          });
+      }
+
+      function updateFlipCard(card, newDigit) {
+          const oldDigit = card.dataset.val;
+          if (oldDigit === newDigit) return;
+
+          // Cancel any in-progress animation
+          if (card._flipCleanup) clearTimeout(card._flipCleanup);
+          if (card._flipRaf) cancelAnimationFrame(card._flipRaf);
+
+          // Grab elements
+          const upper = card.querySelector('.fc-upper .fc-num');
+          const lower = card.querySelector('.fc-lower .fc-num');
+          const flapTop = card.querySelector('.fc-flap-top');
+          const flapBtm = card.querySelector('.fc-flap-btm');
+          const flapTopN = flapTop.querySelector('.fc-num');
+          const flapBtmN = flapBtm.querySelector('.fc-num');
+
+          // 1) Set layer content
+          upper.textContent = newDigit;   // revealed
+          lower.textContent = oldDigit;   // hidden
+          flapTopN.textContent = oldDigit;   // folds away
+          flapBtmN.textContent = newDigit;   // unfolds
+
+          // 2) Instantly reset flaps
+          flapTop.style.transition = 'none';
+          flapBtm.style.transition = 'none';
+          flapTop.style.transform = 'rotateX(0)';
+          flapBtm.style.transform = 'rotateX(90deg)';
+
+          // 3) Double-rAF for reliable paint
+          card._flipRaf = requestAnimationFrame(() => {
+              card._flipRaf = requestAnimationFrame(() => {
+                  // Apply transition
+                  flapTop.style.transition = 'transform 0.3s ease-in';
+                  flapBtm.style.transition = 'transform 0.25s ease-out 0.2s';
+                  flapTop.style.transform = 'rotateX(-90deg)';
+                  flapBtm.style.transform = 'rotateX(0)';
+              });
+          });
+
+          // 4) Cleanup after animation
+          card._flipCleanup = setTimeout(() => {
+              upper.textContent = newDigit;
+              lower.textContent = newDigit;
+              flapTopN.textContent = newDigit;
+              flapBtmN.textContent = newDigit;
+              flapTop.style.transition = 'none';
+              flapBtm.style.transition = 'none';
+              flapTop.style.transform = 'rotateX(0)';
+              flapBtm.style.transform = 'rotateX(90deg)';
+              card.dataset.val = newDigit;
+          }, 520);
+      }
+
+      function cancelDelay() {
+        clearInterval(delayTimer);
+        hideModal('delayModal');
+      }
+
+      function sendNotify() {
+        if (currentSessionId && (currentSessionStatus === 'active' || currentSessionStatus === 'arriving')) {
+          showToast('已有进行中的会话，已为你打开');
+          resumeSession();
+          return;
+        }
+        const shareLocation = document.getElementById('shareLocationToggle').checked;
+        const locationToSend = shareLocation ? userLocation : null;
+        
+        if (locationToSend) {
+          doSendNotify(locationToSend);
+        } else {
+          startDelayCountdown();
+        }
+      }
+
+      async function doSendNotify(locationToSend) {
+        const btn = document.getElementById('notifyBtn');
+        const msg = document.getElementById('msgInput').value;
+        const delayed = false; // Client side delay already handled
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
+        try {
+          const res = await fetch(API_BASE + '/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, location: locationToSend, delayed: delayed })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            if (delayed) showToast('⏳ 通知将延迟30秒发送'); // Should basically never happen with forced false
+            else showToast('✅ 发送成功！');
+            if (data.localMeowRequest) {
+              sendMeowLocal(data.localMeowRequest).catch((err) => {
+                console.error(err);
+                showToast('⚠️ MeoW 本地发送失败，请重试');
+              });
+            }
+            const mainView = document.getElementById('mainView');
+            if (mainView) mainView.style.display = 'none';
+            const successView = document.getElementById('successView');
+            if (successView) successView.style.display = 'flex';
+            if (data.sessionId) {
+              applySessionInfo({ sessionId: data.sessionId, sessionStatus: 'active', sessionCompletedAt: null });
+              history.replaceState(null, '', '/' + data.sessionId);
+            }
+            ownerConfirmed = false;
+            retryCooldownSeconds = 30;
+            callCooldownSeconds = 30;
+            startRetryCooldown(retryCooldownSeconds);
+            disablePhoneUntilRetry();
+            updateActionHint();
+            startPolling();
+          } else {
+            // 显示后端返回的具体错误信息
+            throw new Error(data.error || 'API Error');
+          }
+        } catch (e) {
+          console.error(e);
+          showToast('❌ 错误: ' + e.message);
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔔</span><span>一键通知车主</span>';
+        }
+      }
+      document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      function startPolling() {
+        let count = 0;
+        checkTimer = setInterval(async () => {
+          count++;
+          if (count > 120) { clearInterval(checkTimer); return; }
+          try {
+            const res = await fetch(API_BASE + '/check-status');
+            const data = await res.json();
+            handleStatusResponse(data);
+            if (data.status === 'arriving') {
+              if (!ownerConfirmed) {
+                ownerConfirmed = true;
+                retryCooldownSeconds = 60;
+                callCooldownSeconds = 180;
+                updateActionHint();
+              }
+              if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            } else if (data.status === 'closed') {
+              clearInterval(checkTimer);
+            }
+          } catch(e) {}
+        }, 3000);
+      }
+      function showToast(text) {
+        const t = document.getElementById('toast');
+        t.innerText = text;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+      }
+      async function retryNotify() {
+        const btn = document.getElementById('retryBtn');
+        if (Date.now() < retryReadyAt) {
+          showToast('⏳ 请等待倒计时结束再提醒');
+          return;
+        }
+        let success = false;
+        btn.disabled = true;
+        btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
+        try {
+          const res = await fetch(API_BASE + '/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: '再次通知：请尽快挪车', location: userLocation, sessionId: currentSessionId })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            if (data.localMeowRequest) {
+              sendMeowLocal(data.localMeowRequest).catch((err) => {
+                console.error(err);
+                showToast('⚠️ MeoW 本地发送失败，请重试');
+              });
+            }
+            showToast('✅ 再次通知已发送！');
+            document.getElementById('waitingText').innerText = '已再次通知，等待车主回应...';
+            startRetryCooldown(retryCooldownSeconds);
+            startPhoneCooldown(callCooldownSeconds);
+            success = true;
+          } else { throw new Error('API Error'); }
+        } catch (e) { showToast('❌ 发送失败，请重试'); }
+        if (!success) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+        }
+      }
+
+// Spotlight tracking effect
     (function () {
       const buttons = Array.from(document.querySelectorAll('.spot-btn'));
+      if (!buttons.length) return;
+      const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const isFine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
       const MAX_DIST = 110;
       const SOURCE_RADIUS = 300;
       let lastX = -10000;
@@ -1010,6 +2104,15 @@
       let sourceIntensity = 0;
       let targetSourceIntensity = 0;
       let rafId = 0;
+      let pointerRaf = 0;
+      let pointerActive = false;
+
+      const shouldUpdate = () => {
+        if (document.hidden) return false;
+        if (document.body.classList.contains('anim-paused')) return false;
+        if (isCoarse && !pointerActive && sourceIntensity === 0 && targetSourceIntensity === 0) return false;
+        return true;
+      };
 
       const resetSpot = (btn) => {
         btn.style.setProperty('--bx', '-1000px');
@@ -1072,7 +2175,25 @@
         });
       };
 
+      const scheduleUpdate = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
+        if (pointerRaf) return;
+        pointerRaf = requestAnimationFrame(() => {
+          pointerRaf = 0;
+          if (lastX > -9999) {
+            updateAll(lastX, lastY);
+          }
+        });
+      };
+
       const tick = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
         sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
         if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
           sourceIntensity = targetSourceIntensity;
@@ -1089,18 +2210,48 @@
 
       const resetAll = () => {
         buttons.forEach(resetSpot);
+        if (pointerRaf) {
+          cancelAnimationFrame(pointerRaf);
+          pointerRaf = 0;
+        }
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
         sourceIntensity = 0;
         targetSourceIntensity = 0;
         sourceX = -10000;
         sourceY = -10000;
         lastX = -10000;
         lastY = -10000;
+        pointerActive = false;
       };
 
       document.addEventListener('pointermove', (e) => {
         lastX = e.clientX;
         lastY = e.clientY;
-        updateAll(lastX, lastY);
+        if (isCoarse && !pointerActive) return;
+        if (isCoarse) {
+          sourceX = lastX;
+          sourceY = lastY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        }
+        scheduleUpdate();
+      });
+
+      document.addEventListener('pointerup', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
+      });
+
+      document.addEventListener('pointercancel', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
       });
 
       document.addEventListener('pointerout', (e) => {
@@ -1109,26 +2260,32 @@
 
       document.addEventListener('pointerleave', resetAll);
       document.addEventListener('mouseleave', resetAll);
-      document.addEventListener('pointercancel', resetAll);
 
       window.addEventListener('blur', resetAll);
       window.addEventListener('resize', () => {
-        if (lastX > -9999) updateAll(lastX, lastY);
+        if (lastX > -9999) scheduleUpdate();
       });
 
       buttons.forEach((btn) => {
         resetSpot(btn);
         btn.addEventListener('pointerenter', (e) => {
+          if (!isFine) return;
           sourceX = e.clientX;
           sourceY = e.clientY;
           targetSourceIntensity = 1;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerleave', () => {
+          if (!isFine) return;
           targetSourceIntensity = 0;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerdown', (e) => {
+          pointerActive = true;
+          sourceX = e.clientX;
+          sourceY = e.clientY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
           btn.dataset.pressStart = String(performance.now());
           const rect = btn.getBoundingClientRect();
           const rx = e.clientX - rect.left;
@@ -1150,6 +2307,11 @@
           btn.style.setProperty('--ripple-ms', outMs + 'ms');
           if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
           btn._rippleTimer = setTimeout(() => btn.classList.remove('ripple-on'), outMs);
+          if (isCoarse) {
+            pointerActive = false;
+            targetSourceIntensity = 0;
+            if (!rafId) rafId = requestAnimationFrame(tick);
+          }
         };
         btn.addEventListener('pointerup', endRipple);
         btn.addEventListener('pointercancel', endRipple);
@@ -1159,3 +2321,4 @@
 </body>
 
 </html>
+  
