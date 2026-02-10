@@ -916,9 +916,9 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         radial-gradient(40% 50% at 80% 80%, var(--fluid-4), transparent 70%),
         linear-gradient(120deg, var(--fluid-base-1) 0%, var(--fluid-base-2) 50%, var(--fluid-base-3) 100%);
       opacity: 1;
-      animation: fluid-drift 18s ease-in-out infinite alternate, fluid-shift 28s ease-in-out infinite;
+      animation: fluid-drift 28s ease-in-out infinite alternate;
       pointer-events: none;
-      filter: saturate(1.3) contrast(1.05) brightness(1.1);
+      filter: saturate(1.15) brightness(1.05);
     }
 
     .bg-fluid::before,
@@ -936,8 +936,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         radial-gradient(60% 65% at 75% 65%, var(--fluid-6), transparent 72%),
         radial-gradient(45% 55% at 60% 15%, rgba(255, 255, 255, 0.08), transparent 70%);
       opacity: 0.85;
-      filter: blur(3px);
-      animation: fluid-float 22s ease-in-out infinite;
+      filter: blur(2px);
+      animation: fluid-float 30s ease-in-out infinite;
     }
 
     .bg-fluid::after {
@@ -946,8 +946,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         radial-gradient(50% 60% at 70% 35%, rgba(236, 72, 153, 0.18), transparent 70%),
         radial-gradient(55% 65% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 75%);
       opacity: 0.7;
-      filter: blur(8px);
-      animation: fluid-sway 30s ease-in-out infinite alternate;
+      filter: blur(6px);
+      animation: fluid-sway 36s ease-in-out infinite alternate;
     }
 
     .bg-noise {
@@ -1016,6 +1016,53 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       100% {
         background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
       }
+    }
+
+    .anim-paused .bg-fluid,
+    .anim-paused .bg-fluid::before,
+    .anim-paused .bg-fluid::after {
+      animation-play-state: paused;
+    }
+
+    @media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+      .bg-fluid,
+      .bg-fluid::before,
+      .bg-fluid::after {
+        animation: none !important;
+        filter: none !important;
+      }
+
+      .bg-noise {
+        opacity: 0.05;
+      }
+    }
+
+    .low-power .bg-fluid,
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      animation: none !important;
+      filter: none !important;
+    }
+
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      display: none;
+    }
+
+    .low-power .bg-noise {
+      opacity: 0.04;
+    }
+
+    .low-power .card,
+    .low-power .spot-btn {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .low-power .card,
+    .low-power .spot-btn {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     .main-container {
@@ -1806,7 +1853,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.3.5.beta1</div>
+        v2.3.5.beta2</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -1951,6 +1998,48 @@ let userLocation = null;
           sessionCard.addEventListener('click', () => resumeSession());
         }
       };
+      let idleKick = null;
+      function setupPowerMode() {
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const saveData = navigator.connection && navigator.connection.saveData;
+        const lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+        const lowPower = !!(prefersReduced || saveData || lowMem);
+        document.body.classList.toggle('low-power', lowPower);
+      }
+      function setupIdlePause() {
+        const IDLE_MS = 4500;
+        let timer = 0;
+        const kick = () => {
+          if (!document.hidden) {
+            document.body.classList.remove('anim-paused');
+          }
+          if (timer) clearTimeout(timer);
+          if (!document.hidden) {
+            timer = setTimeout(() => {
+              if (!document.hidden) document.body.classList.add('anim-paused');
+            }, IDLE_MS);
+          }
+        };
+        idleKick = kick;
+        ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((evt) => {
+          window.addEventListener(evt, kick, { passive: true });
+        });
+        kick();
+      }
+      setupPowerMode();
+      setupIdlePause();
+      if (window.matchMedia) {
+        const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (motionQuery.addEventListener) motionQuery.addEventListener('change', setupPowerMode);
+        else if (motionQuery.addListener) motionQuery.addListener(setupPowerMode);
+      }
+      if (navigator.connection && navigator.connection.addEventListener) {
+        navigator.connection.addEventListener('change', setupPowerMode);
+      }
+      document.addEventListener('visibilitychange', () => {
+        document.body.classList.toggle('anim-paused', document.hidden);
+        if (!document.hidden && idleKick) idleKick();
+      });
       function initActionControls() {
         const phoneBtn = document.getElementById('phoneBtn');
         if (phoneBtn) {
@@ -2505,6 +2594,9 @@ let userLocation = null;
 // Spotlight tracking effect
     (function () {
       const buttons = Array.from(document.querySelectorAll('.spot-btn'));
+      if (!buttons.length) return;
+      const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const isFine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
       const MAX_DIST = 110;
       const SOURCE_RADIUS = 300;
       let lastX = -10000;
@@ -2515,6 +2607,14 @@ let userLocation = null;
       let targetSourceIntensity = 0;
       let rafId = 0;
       let pointerRaf = 0;
+      let pointerActive = false;
+
+      const shouldUpdate = () => {
+        if (document.hidden) return false;
+        if (document.body.classList.contains('anim-paused')) return false;
+        if (isCoarse && !pointerActive && sourceIntensity === 0 && targetSourceIntensity === 0) return false;
+        return true;
+      };
 
       const resetSpot = (btn) => {
         btn.style.setProperty('--bx', '-1000px');
@@ -2578,6 +2678,10 @@ let userLocation = null;
       };
 
       const scheduleUpdate = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
         if (pointerRaf) return;
         pointerRaf = requestAnimationFrame(() => {
           pointerRaf = 0;
@@ -2588,6 +2692,10 @@ let userLocation = null;
       };
 
       const tick = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
         sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
         if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
           sourceIntensity = targetSourceIntensity;
@@ -2608,18 +2716,44 @@ let userLocation = null;
           cancelAnimationFrame(pointerRaf);
           pointerRaf = 0;
         }
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
         sourceIntensity = 0;
         targetSourceIntensity = 0;
         sourceX = -10000;
         sourceY = -10000;
         lastX = -10000;
         lastY = -10000;
+        pointerActive = false;
       };
 
       document.addEventListener('pointermove', (e) => {
         lastX = e.clientX;
         lastY = e.clientY;
+        if (isCoarse && !pointerActive) return;
+        if (isCoarse) {
+          sourceX = lastX;
+          sourceY = lastY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        }
         scheduleUpdate();
+      });
+
+      document.addEventListener('pointerup', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
+      });
+
+      document.addEventListener('pointercancel', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
       });
 
       document.addEventListener('pointerout', (e) => {
@@ -2628,7 +2762,6 @@ let userLocation = null;
 
       document.addEventListener('pointerleave', resetAll);
       document.addEventListener('mouseleave', resetAll);
-      document.addEventListener('pointercancel', resetAll);
 
       window.addEventListener('blur', resetAll);
       window.addEventListener('resize', () => {
@@ -2638,16 +2771,23 @@ let userLocation = null;
       buttons.forEach((btn) => {
         resetSpot(btn);
         btn.addEventListener('pointerenter', (e) => {
+          if (!isFine) return;
           sourceX = e.clientX;
           sourceY = e.clientY;
           targetSourceIntensity = 1;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerleave', () => {
+          if (!isFine) return;
           targetSourceIntensity = 0;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerdown', (e) => {
+          pointerActive = true;
+          sourceX = e.clientX;
+          sourceY = e.clientY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
           btn.dataset.pressStart = String(performance.now());
           const rect = btn.getBoundingClientRect();
           const rx = e.clientX - rect.left;
@@ -2669,6 +2809,11 @@ let userLocation = null;
           btn.style.setProperty('--ripple-ms', outMs + 'ms');
           if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
           btn._rippleTimer = setTimeout(() => btn.classList.remove('ripple-on'), outMs);
+          if (isCoarse) {
+            pointerActive = false;
+            targetSourceIntensity = 0;
+            if (!rafId) rafId = requestAnimationFrame(tick);
+          }
         };
         btn.addEventListener('pointerup', endRipple);
         btn.addEventListener('pointercancel', endRipple);
@@ -2832,9 +2977,9 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
         radial-gradient(40% 50% at 80% 80%, var(--fluid-4), transparent 70%),
         linear-gradient(120deg, var(--fluid-base-1) 0%, var(--fluid-base-2) 50%, var(--fluid-base-3) 100%);
       opacity: 1;
-      animation: fluid-drift 18s ease-in-out infinite alternate, fluid-shift 28s ease-in-out infinite;
+      animation: fluid-drift 28s ease-in-out infinite alternate;
       pointer-events: none;
-      filter: saturate(1.3) contrast(1.05) brightness(1.1);
+      filter: saturate(1.15) brightness(1.05);
     }
 
     .bg-fluid::before,
@@ -2852,8 +2997,8 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
         radial-gradient(60% 65% at 75% 65%, var(--fluid-6), transparent 72%),
         radial-gradient(45% 55% at 60% 15%, rgba(255, 255, 255, 0.08), transparent 70%);
       opacity: 0.85;
-      filter: blur(3px);
-      animation: fluid-float 22s ease-in-out infinite;
+      filter: blur(2px);
+      animation: fluid-float 30s ease-in-out infinite;
     }
 
     .bg-fluid::after {
@@ -2862,8 +3007,8 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
         radial-gradient(50% 60% at 70% 35%, rgba(236, 72, 153, 0.18), transparent 70%),
         radial-gradient(55% 65% at 50% 50%, rgba(255, 255, 255, 0.06), transparent 75%);
       opacity: 0.7;
-      filter: blur(8px);
-      animation: fluid-sway 30s ease-in-out infinite alternate;
+      filter: blur(6px);
+      animation: fluid-sway 36s ease-in-out infinite alternate;
     }
 
     .bg-noise {
@@ -2932,6 +3077,47 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       100% {
         background-position: 0% 0%, 100% 0%, 30% 100%, 80% 80%, 50% 50%;
       }
+    }
+
+    .anim-paused .bg-fluid,
+    .anim-paused .bg-fluid::before,
+    .anim-paused .bg-fluid::after {
+      animation-play-state: paused;
+    }
+
+    @media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+      .bg-fluid,
+      .bg-fluid::before,
+      .bg-fluid::after {
+        animation: none !important;
+        filter: none !important;
+      }
+
+      .bg-noise {
+        opacity: 0.05;
+      }
+    }
+
+    .low-power .bg-fluid,
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      animation: none !important;
+      filter: none !important;
+    }
+
+    .low-power .bg-fluid::before,
+    .low-power .bg-fluid::after {
+      display: none;
+    }
+
+    .low-power .bg-noise {
+      opacity: 0.04;
+    }
+
+    .low-power .card,
+    .low-power .spot-btn {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     /* Glass Card */
@@ -3335,6 +3521,48 @@ let ownerLocation = null;
           await fetch(API_BASE + '/get-session?role=owner&session=' + encodeURIComponent(SESSION_TOKEN));
         } catch(e) {}
       }
+      let idleKick = null;
+      function setupPowerMode() {
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const saveData = navigator.connection && navigator.connection.saveData;
+        const lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+        const lowPower = !!(prefersReduced || saveData || lowMem);
+        document.body.classList.toggle('low-power', lowPower);
+      }
+      function setupIdlePause() {
+        const IDLE_MS = 4500;
+        let timer = 0;
+        const kick = () => {
+          if (!document.hidden) {
+            document.body.classList.remove('anim-paused');
+          }
+          if (timer) clearTimeout(timer);
+          if (!document.hidden) {
+            timer = setTimeout(() => {
+              if (!document.hidden) document.body.classList.add('anim-paused');
+            }, IDLE_MS);
+          }
+        };
+        idleKick = kick;
+        ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((evt) => {
+          window.addEventListener(evt, kick, { passive: true });
+        });
+        kick();
+      }
+      setupPowerMode();
+      setupIdlePause();
+      if (window.matchMedia) {
+        const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (motionQuery.addEventListener) motionQuery.addEventListener('change', setupPowerMode);
+        else if (motionQuery.addListener) motionQuery.addListener(setupPowerMode);
+      }
+      if (navigator.connection && navigator.connection.addEventListener) {
+        navigator.connection.addEventListener('change', setupPowerMode);
+      }
+      document.addEventListener('visibilitychange', () => {
+        document.body.classList.toggle('anim-paused', document.hidden);
+        if (!document.hidden && idleKick) idleKick();
+      });
       document.addEventListener('contextmenu', (e) => e.preventDefault());
 
       async function confirmMove() {
@@ -3409,6 +3637,9 @@ let ownerLocation = null;
 // Spotlight tracking effect
     (function () {
       const buttons = Array.from(document.querySelectorAll('.spot-btn'));
+      if (!buttons.length) return;
+      const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const isFine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
       const MAX_DIST = 110;
       const SOURCE_RADIUS = 300;
       let lastX = -10000;
@@ -3419,6 +3650,14 @@ let ownerLocation = null;
       let targetSourceIntensity = 0;
       let rafId = 0;
       let pointerRaf = 0;
+      let pointerActive = false;
+
+      const shouldUpdate = () => {
+        if (document.hidden) return false;
+        if (document.body.classList.contains('anim-paused')) return false;
+        if (isCoarse && !pointerActive && sourceIntensity === 0 && targetSourceIntensity === 0) return false;
+        return true;
+      };
 
       const resetSpot = (btn) => {
         btn.style.setProperty('--bx', '-1000px');
@@ -3482,6 +3721,10 @@ let ownerLocation = null;
       };
 
       const scheduleUpdate = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
         if (pointerRaf) return;
         pointerRaf = requestAnimationFrame(() => {
           pointerRaf = 0;
@@ -3491,6 +3734,10 @@ let ownerLocation = null;
         });
       };
       const tick = () => {
+        if (!shouldUpdate()) {
+          resetAll();
+          return;
+        }
         sourceIntensity += (targetSourceIntensity - sourceIntensity) * 0.12;
         if (Math.abs(targetSourceIntensity - sourceIntensity) < 0.01) {
           sourceIntensity = targetSourceIntensity;
@@ -3511,18 +3758,44 @@ let ownerLocation = null;
           cancelAnimationFrame(pointerRaf);
           pointerRaf = 0;
         }
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
         sourceIntensity = 0;
         targetSourceIntensity = 0;
         sourceX = -10000;
         sourceY = -10000;
         lastX = -10000;
         lastY = -10000;
+        pointerActive = false;
       };
 
       document.addEventListener('pointermove', (e) => {
         lastX = e.clientX;
         lastY = e.clientY;
+        if (isCoarse && !pointerActive) return;
+        if (isCoarse) {
+          sourceX = lastX;
+          sourceY = lastY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
+        }
         scheduleUpdate();
+      });
+
+      document.addEventListener('pointerup', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
+      });
+
+      document.addEventListener('pointercancel', () => {
+        if (!isCoarse) return;
+        pointerActive = false;
+        targetSourceIntensity = 0;
+        if (!rafId) rafId = requestAnimationFrame(tick);
       });
 
       document.addEventListener('pointerout', (e) => {
@@ -3531,7 +3804,6 @@ let ownerLocation = null;
 
       document.addEventListener('pointerleave', resetAll);
       document.addEventListener('mouseleave', resetAll);
-      document.addEventListener('pointercancel', resetAll);
 
       window.addEventListener('blur', resetAll);
       window.addEventListener('resize', () => {
@@ -3541,16 +3813,23 @@ let ownerLocation = null;
       buttons.forEach((btn) => {
         resetSpot(btn);
         btn.addEventListener('pointerenter', (e) => {
+          if (!isFine) return;
           sourceX = e.clientX;
           sourceY = e.clientY;
           targetSourceIntensity = 1;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerleave', () => {
+          if (!isFine) return;
           targetSourceIntensity = 0;
           if (!rafId) rafId = requestAnimationFrame(tick);
         });
         btn.addEventListener('pointerdown', (e) => {
+          pointerActive = true;
+          sourceX = e.clientX;
+          sourceY = e.clientY;
+          targetSourceIntensity = 1;
+          if (!rafId) rafId = requestAnimationFrame(tick);
           btn.dataset.pressStart = String(performance.now());
           const rect = btn.getBoundingClientRect();
           const rx = e.clientX - rect.left;
@@ -3572,6 +3851,11 @@ let ownerLocation = null;
           btn.style.setProperty('--ripple-ms', outMs + 'ms');
           if (btn._rippleTimer) clearTimeout(btn._rippleTimer);
           btn._rippleTimer = setTimeout(() => btn.classList.remove('ripple-on'), outMs);
+          if (isCoarse) {
+            pointerActive = false;
+            targetSourceIntensity = 0;
+            if (!rafId) rafId = requestAnimationFrame(tick);
+          }
         };
         btn.addEventListener('pointerup', endRipple);
         btn.addEventListener('pointercancel', endRipple);
