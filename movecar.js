@@ -821,6 +821,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       --text-secondary: rgba(255, 255, 255, 0.65);
       --accent: #ffffff;
 
+      --pill-radius: 999px;
+
       --btn-bg: rgba(255, 255, 255, 0.06);
       --btn-base-border: rgba(255, 255, 255, 0.08);
       --btn-hover-bg: #ffffff;
@@ -1070,6 +1072,16 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       -webkit-backdrop-filter: none;
     }
 
+    .low-power .toggle-slider {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .low-power .toggle-slider {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
     .low-power .card,
     .low-power .spot-btn {
       backdrop-filter: none;
@@ -1204,7 +1216,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       background: rgba(255, 255, 255, 0.08);
       color: var(--text-primary);
       padding: 10px 16px;
-      border-radius: 20px;
+      border-radius: var(--pill-radius);
       font-size: 14px;
       font-weight: 600;
       white-space: nowrap;
@@ -1230,10 +1242,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     }
 
     .loc-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      display: contents;
     }
 
     .loc-icon {
@@ -1276,12 +1285,19 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .loc-content {
       flex: 1;
       min-width: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      align-items: center;
+      column-gap: 12px;
     }
 
     .loc-title {
       font-size: 16px;
       font-weight: 600;
       color: var(--text-primary);
+      grid-column: 1;
+      grid-row: 1;
     }
 
     .loc-status {
@@ -1291,6 +1307,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      grid-column: 1;
+      grid-row: 2;
     }
 
     /* Toggle */
@@ -1301,6 +1319,10 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       width: 52px;
       height: 30px;
       flex-shrink: 0;
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+      justify-self: end;
     }
 
     .toggle input {
@@ -1313,10 +1335,14 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       position: absolute;
       cursor: pointer;
       inset: 0;
-      background: var(--toggle-bg);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
       border: 1px solid var(--toggle-border);
       border-radius: 999px;
-      transition: background 0.25s, border 0.25s;
+      transition: background 0.25s, border 0.25s, box-shadow 0.25s;
+      backdrop-filter: blur(10px) saturate(1.6);
+      -webkit-backdrop-filter: blur(10px) saturate(1.6);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.45), inset 0 -1px 2px rgba(0, 0, 0, 0.12), 0 6px 14px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
     }
 
     .toggle-slider::before {
@@ -1326,19 +1352,34 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       width: 24px;
       left: 2px;
       top: 2px;
-      background: var(--toggle-knob);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 235, 235, 0.92));
       border-radius: 50%;
       transition: transform 0.25s var(--ease-elastic);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    }
+
+    .toggle-slider::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: 999px;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
+      opacity: 0.55;
+      pointer-events: none;
     }
 
     .toggle input:checked+.toggle-slider {
-      background: var(--toggle-checked-bg);
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
       border-color: var(--toggle-checked-border);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(16, 185, 129, 0.35);
     }
 
     .toggle input:checked+.toggle-slider::before {
       transform: translateX(22px);
+    }
+
+    .toggle input:checked+.toggle-slider::after {
+      opacity: 0.25;
     }
 
     /* Spot Button - with spotlight border effect */
@@ -1421,7 +1462,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       width: 100%;
       padding: clamp(16px, 4vw, 20px);
       border: none;
-      border-radius: var(--card-radius);
+      border-radius: var(--pill-radius);
       font-size: clamp(16px, 4vw, 18px);
       font-weight: 700;
       cursor: pointer;
@@ -1458,7 +1499,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       width: 100%;
       padding: 14px 20px;
       border: none;
-      border-radius: 16px;
+      border-radius: var(--pill-radius);
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
@@ -1488,7 +1529,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .map-btn {
       flex: 1;
       padding: 12px 16px;
-      border-radius: 12px;
+      border-radius: var(--pill-radius);
       text-decoration: none;
       font-weight: 600;
       font-size: 14px;
@@ -1593,7 +1634,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(15, 23, 42, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1612,10 +1653,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     }
 
     .modal-box {
-      background: var(--glass-surface);
-      backdrop-filter: blur(20px) saturate(1.3);
-      -webkit-backdrop-filter: blur(20px) saturate(1.3);
-      border: 1px solid var(--glass-border);
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 24px;
       padding: clamp(24px, 6vw, 32px);
       max-width: 340px;
@@ -1623,7 +1662,8 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       text-align: center;
       transform: scale(0.9);
       transition: transform 0.3s var(--ease-out-expo);
-      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
+      color: #0f172a;
     }
 
     .modal-overlay.show .modal-box {
@@ -1638,13 +1678,13 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-title {
       font-size: 18px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: #0f172a;
       margin-bottom: 8px;
     }
 
     .modal-desc {
       font-size: 14px;
-      color: var(--text-secondary);
+      color: #475569;
       margin-bottom: 24px;
       line-height: 1.6;
     }
@@ -1657,13 +1697,15 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-btn {
       flex: 1;
       padding: 14px 16px;
-      border-radius: 14px;
+      border-radius: var(--pill-radius);
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      border: none;
-      color: var(--text-primary);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #ffffff;
+      color: #0f172a;
       transition: transform 0.2s ease;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
     }
 
     .modal-btn:active {
@@ -1671,56 +1713,105 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     }
 
     .modal-btn-danger {
-      background: rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fecaca;
     }
 
-    /* Countdown */
+    .modal-box .spot-btn {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .modal-box .spot-btn::before {
+      display: none;
+    }
+
+    /* Countdown - New Implementation */
     .countdown-container {
       display: flex;
       justify-content: center;
       margin: 20px 0;
     }
 
-    .flip-card {
-      --flip-bg: rgba(10, 10, 14, 0.9);
-      position: relative;
-      width: clamp(120px, 30vw, 150px);
-      height: clamp(90px, 22vw, 120px);
-      border-radius: 14px;
-      background: var(--flip-bg);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      perspective: 800px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-      font-size: clamp(56px, 14vw, 80px);
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: #fff;
+    .flip-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 2.5vw, 14px);
     }
 
-    .flip-half {
+    .flip-card {
+      --fc-bg: #0a0a0e;
+      --fc-bg-top: #111116;
+      --fc-bg-btm: #0a0a0e;
+      position: relative;
+      width: clamp(64px, 16vw, 86px);
+      height: clamp(82px, 20vw, 110px);
+      border-radius: 16px;
+      perspective: 600px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: clamp(44px, 12vw, 68px);
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Four layers: upper bg, lower bg, top flap, bottom flap */
+    .fc-upper,
+    .fc-lower,
+    .fc-flap-top,
+    .fc-flap-btm {
       position: absolute;
       left: 0;
       right: 0;
       height: 50%;
       overflow: hidden;
-      background: var(--flip-bg);
-      backface-visibility: hidden;
     }
 
-    .flip-top {
+    /* Static background layers (z-index 1) */
+    .fc-upper {
       top: 0;
-      border-top-left-radius: 14px;
-      border-top-right-radius: 14px;
+      z-index: 1;
+      background: var(--fc-bg-top);
+      border-radius: 14px 14px 0 0;
     }
 
-    .flip-bottom {
+    .fc-lower {
       bottom: 0;
-      border-bottom-left-radius: 14px;
-      border-bottom-right-radius: 14px;
+      z-index: 1;
+      background: var(--fc-bg-btm);
+      border-radius: 0 0 14px 14px;
     }
 
-    .flip-text {
+    /* Animated flap layers (z-index 3) */
+    .fc-flap-top {
+      top: 0;
+      z-index: 3;
+      background: var(--fc-bg-top);
+      border-radius: 14px 14px 0 0;
+      transform-origin: bottom center;
+      backface-visibility: hidden;
+      /* transition set dynamically by JS */
+    }
+
+    .fc-flap-btm {
+      bottom: 0;
+      z-index: 3;
+      background: var(--fc-bg-btm);
+      border-radius: 0 0 14px 14px;
+      transform-origin: top center;
+      transform: rotateX(90deg);
+      backface-visibility: hidden;
+      /* transition set dynamically by JS */
+    }
+
+    /* Number text - 200% height trick clips to top or bottom half */
+    .fc-num {
       position: absolute;
       left: 0;
       right: 0;
@@ -1729,75 +1820,43 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       align-items: center;
       justify-content: center;
       line-height: 1;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     }
 
-    .flip-top .flip-text {
+    .fc-upper .fc-num,
+    .fc-flap-top .fc-num {
       top: 0;
     }
 
-    .flip-bottom .flip-text {
+    .fc-lower .fc-num,
+    .fc-flap-btm .fc-num {
       bottom: 0;
     }
 
-    .flip-static {
-      z-index: 1;
-    }
-
-    .flip-anim {
-      z-index: 3;
-      transform-style: preserve-3d;
-    }
-
-    .flip-top.flip-anim {
-      transform-origin: bottom;
-    }
-
-    .flip-bottom.flip-anim {
-      transform-origin: top;
-      transform: rotateX(90deg);
-    }
-
+    /* Center divider line */
     .flip-card::after {
       content: '';
       position: absolute;
       top: 50%;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: rgba(0, 0, 0, 0.5);
+      left: 4px;
+      right: 4px;
+      height: 1.5px;
+      background: rgba(0, 0, 0, 0.6);
       transform: translateY(-50%);
-      z-index: 2;
+      z-index: 10;
       pointer-events: none;
     }
 
-    .flip-card.flip .flip-top.flip-anim {
-      animation: flipTop 0.32s var(--ease-out-expo) forwards;
-    }
-
-    .flip-card.flip .flip-bottom.flip-anim {
-      animation: flipBottom 0.32s var(--ease-out-expo) forwards;
-      animation-delay: 0.18s;
-    }
-
-    @keyframes flipTop {
-      from {
-        transform: rotateX(0deg);
-      }
-
-      to {
-        transform: rotateX(-90deg);
-      }
-    }
-
-    @keyframes flipBottom {
-      from {
-        transform: rotateX(90deg);
-      }
-
-      to {
-        transform: rotateX(0deg);
-      }
+    /* Subtle inner shadow on top panel for depth */
+    .fc-upper::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.15));
+      pointer-events: none;
     }
 
     @media (max-width: 768px) {
@@ -1838,11 +1897,19 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         <div class="modal-title">正在延迟发送</div>
         <div class="modal-desc">未提供位置信息，<br>将在倒计时结束后发送通知</div>
         <div class="countdown-container">
-          <div id="countdownNum" class="flip-card">
-            <span class="flip-half flip-top flip-static"><span class="flip-text">30</span></span>
-            <span class="flip-half flip-bottom flip-static"><span class="flip-text">30</span></span>
-            <span class="flip-half flip-top flip-anim"><span class="flip-text">30</span></span>
-            <span class="flip-half flip-bottom flip-anim"><span class="flip-text">30</span></span>
+          <div id="countdownNum" class="flip-wrap" aria-label="30">
+            <div class="flip-card" data-digit="tens" data-val="3">
+                <div class="fc-upper"><span class="fc-num">3</span></div>
+                <div class="fc-lower"><span class="fc-num">3</span></div>
+                <div class="fc-flap-top"><span class="fc-num">3</span></div>
+                <div class="fc-flap-btm"><span class="fc-num">3</span></div>
+            </div>
+            <div class="flip-card" data-digit="ones" data-val="0">
+                <div class="fc-upper"><span class="fc-num">0</span></div>
+                <div class="fc-lower"><span class="fc-num">0</span></div>
+                <div class="fc-flap-top"><span class="fc-num">0</span></div>
+                <div class="fc-flap-btm"><span class="fc-num">0</span></div>
+            </div>
           </div>
         </div>
         <div class="modal-buttons">
@@ -1870,7 +1937,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.4.0</div>
+        v2.4.2</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -2465,30 +2532,95 @@ let userLocation = null;
          const el = document.getElementById('countdownNum');
          if (!el) return;
          const current = countdownVal.toString().padStart(2, '0');
+
          if (lastCountdownVal === null) {
-           lastCountdownVal = countdownVal;
+           // Initialization / Reset
+           lastCountdownVal = current;
+           setFlipDisplay(current);
+           return;
          }
-         const prev = lastCountdownVal.toString().padStart(2, '0');
 
-         const topStatic = el.querySelector('.flip-top.flip-static .flip-text');
-         const bottomStatic = el.querySelector('.flip-bottom.flip-static .flip-text');
-         const topAnim = el.querySelector('.flip-top.flip-anim .flip-text');
-         const bottomAnim = el.querySelector('.flip-bottom.flip-anim .flip-text');
-
-         if (!topStatic || !bottomStatic || !topAnim || !bottomAnim) {
+         const cards = el.querySelectorAll('.flip-card');
+         if (!cards || cards.length < 2) {
            el.innerText = current;
            return;
          }
 
-         topStatic.textContent = current;
-         bottomStatic.textContent = current;
-         topAnim.textContent = prev;
-         bottomAnim.textContent = current;
+         // Animate to new digits
+         updateFlipCard(cards[0], current[0]);
+         updateFlipCard(cards[1], current[1]);
+         lastCountdownVal = current;
+      }
 
-         el.classList.remove('flip');
-         void el.offsetWidth;
-         el.classList.add('flip');
-         lastCountdownVal = countdownVal;
+      function setFlipDisplay(strVal) {
+          const el = document.getElementById('countdownNum');
+          if (!el) return;
+          const str = String(strVal).padStart(2, '0');
+          el.setAttribute('aria-label', str);
+
+          el.querySelectorAll('.flip-card').forEach((card, i) => {
+              const d = str[i];
+              card.dataset.val = d;
+              card.querySelectorAll('.fc-num').forEach(n => n.textContent = d);
+              // Reset flaps to idle
+              const ft = card.querySelector('.fc-flap-top');
+              const fb = card.querySelector('.fc-flap-btm');
+              if (ft) { ft.style.transition = 'none'; ft.style.transform = 'rotateX(0)'; }
+              if (fb) { fb.style.transition = 'none'; fb.style.transform = 'rotateX(90deg)'; }
+          });
+      }
+
+      function updateFlipCard(card, newDigit) {
+          const oldDigit = card.dataset.val;
+          if (oldDigit === newDigit) return;
+
+          // Cancel any in-progress animation
+          if (card._flipCleanup) clearTimeout(card._flipCleanup);
+          if (card._flipRaf) cancelAnimationFrame(card._flipRaf);
+
+          // Grab elements
+          const upper = card.querySelector('.fc-upper .fc-num');
+          const lower = card.querySelector('.fc-lower .fc-num');
+          const flapTop = card.querySelector('.fc-flap-top');
+          const flapBtm = card.querySelector('.fc-flap-btm');
+          const flapTopN = flapTop.querySelector('.fc-num');
+          const flapBtmN = flapBtm.querySelector('.fc-num');
+
+          // 1) Set layer content
+          upper.textContent = newDigit;   // revealed
+          lower.textContent = oldDigit;   // hidden
+          flapTopN.textContent = oldDigit;   // folds away
+          flapBtmN.textContent = newDigit;   // unfolds
+
+          // 2) Instantly reset flaps
+          flapTop.style.transition = 'none';
+          flapBtm.style.transition = 'none';
+          flapTop.style.transform = 'rotateX(0)';
+          flapBtm.style.transform = 'rotateX(90deg)';
+
+          // 3) Double-rAF for reliable paint
+          card._flipRaf = requestAnimationFrame(() => {
+              card._flipRaf = requestAnimationFrame(() => {
+                  // Apply transition
+                  flapTop.style.transition = 'transform 0.3s ease-in';
+                  flapBtm.style.transition = 'transform 0.25s ease-out 0.2s';
+                  flapTop.style.transform = 'rotateX(-90deg)';
+                  flapBtm.style.transform = 'rotateX(0)';
+              });
+          });
+
+          // 4) Cleanup after animation
+          card._flipCleanup = setTimeout(() => {
+              upper.textContent = newDigit;
+              lower.textContent = newDigit;
+              flapTopN.textContent = newDigit;
+              flapBtmN.textContent = newDigit;
+              flapTop.style.transition = 'none';
+              flapBtm.style.transition = 'none';
+              flapTop.style.transform = 'rotateX(0)';
+              flapBtm.style.transform = 'rotateX(90deg)';
+              card.dataset.val = newDigit;
+          }, 520);
       }
 
       function cancelDelay() {
@@ -2910,6 +3042,12 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       --text-primary: #ffffff;
       --text-secondary: rgba(255, 255, 255, 0.65);
 
+      --pill-radius: 999px;
+      --success-bg: rgba(34, 197, 94, 0.22);
+      --success-border: rgba(34, 197, 94, 0.45);
+      --success-text: #d1fae5;
+      --success-shadow: 0 12px 28px rgba(16, 185, 129, 0.25);
+
       --btn-bg: rgba(255, 255, 255, 0.06);
       --btn-base-border: rgba(255, 255, 255, 0.08);
       --btn-hover-bg: #ffffff;
@@ -2949,6 +3087,11 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
         --text-primary: #0f172a;
         --text-secondary: #475569;
         --text-glow: 0 1px 2px rgba(0, 0, 0, 0.15);
+
+        --success-bg: #dcfce7;
+        --success-border: #86efac;
+        --success-text: #14532d;
+        --success-shadow: 0 12px 24px rgba(16, 185, 129, 0.18);
 
         --btn-bg: rgba(255, 255, 255, 0.65);
         --btn-base-border: rgba(0, 0, 0, 0.1);
@@ -3307,7 +3450,7 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       flex: 1;
       min-width: 110px;
       padding: 12px 16px;
-      border-radius: 14px;
+      border-radius: var(--pill-radius);
       text-decoration: none;
       font-weight: 600;
       font-size: 13px;
@@ -3357,10 +3500,14 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       position: absolute;
       cursor: pointer;
       inset: 0;
-      background: var(--toggle-bg);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
       border-radius: 999px;
-      transition: background 0.25s, border 0.25s;
+      transition: background 0.25s, border 0.25s, box-shadow 0.25s;
       border: 1px solid var(--toggle-border);
+      backdrop-filter: blur(10px) saturate(1.6);
+      -webkit-backdrop-filter: blur(10px) saturate(1.6);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.45), inset 0 -1px 2px rgba(0, 0, 0, 0.12), 0 6px 14px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
     }
 
     .toggle-slider::before {
@@ -3370,20 +3517,35 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       width: 24px;
       left: 4px;
       top: 50%;
-      background: var(--toggle-knob);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 235, 235, 0.92));
       border-radius: 50%;
       transform: translateY(-50%);
       transition: transform 0.25s var(--ease-elastic);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    }
+
+    .toggle-slider::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: 999px;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
+      opacity: 0.55;
+      pointer-events: none;
     }
 
     .toggle input:checked+.toggle-slider {
-      background: var(--toggle-checked-bg);
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
       border-color: var(--toggle-checked-border);
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(16, 185, 129, 0.35);
     }
 
     .toggle input:checked+.toggle-slider::before {
       transform: translate(22px, -50%);
+    }
+
+    .toggle input:checked+.toggle-slider::after {
+      opacity: 0.25;
     }
 
     /* Buttons */
@@ -3392,7 +3554,7 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       color: var(--text-primary);
       width: 100%;
       padding: 16px 0;
-      border-radius: var(--card-radius);
+      border-radius: var(--pill-radius);
       font-size: 0.95rem;
       font-weight: 600;
       cursor: pointer;
@@ -3412,7 +3574,7 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
     .btn-ghost {
       width: 100%;
       padding: 12px 0;
-      border-radius: 14px;
+      border-radius: var(--pill-radius);
       font-size: 14px;
       font-weight: 600;
       margin-bottom: 14px;
@@ -3516,12 +3678,14 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
 
     /* Done message */
     .done-msg {
-      background: rgba(66, 200, 140, 0.18);
-      border-radius: 16px;
+      background: var(--success-bg);
+      border-radius: var(--pill-radius);
       padding: 16px 20px;
       margin-top: 18px;
       display: none;
-      border: 1px solid rgba(66, 200, 140, 0.25);
+      border: 1px solid var(--success-border);
+      box-shadow: var(--success-shadow);
+      text-shadow: none;
     }
 
     .done-msg.show {
@@ -3529,7 +3693,7 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
     }
 
     .done-msg p {
-      color: #bbf7d0;
+      color: var(--success-text);
       font-weight: 600;
       font-size: 15px;
     }
@@ -3559,10 +3723,9 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
     <div class="card input-card owner-input">
       <textarea id="ownerMsgInput" placeholder="给对方留言...（可选）"></textarea>
       <div class="tags">
-        <div class="tag spot-btn" onclick="addOwnerTag('我已出发')"><span>🚗 已出发</span></div>
+        <div class="tag spot-btn" onclick="addOwnerTag('来了')"><span>🚗 来了</span></div>
         <div class="tag spot-btn" onclick="addOwnerTag('马上到')"><span>⏱️ 马上到</span></div>
         <div class="tag spot-btn" onclick="addOwnerTag('请稍等')"><span>🙏 请稍等</span></div>
-        <div class="tag spot-btn" onclick="addOwnerTag('已在路上')"><span>🛣️ 在路上</span></div>
       </div>
     </div>
     <div id="mapArea" class="map-section">
