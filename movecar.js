@@ -100,6 +100,7 @@ async function markSessionClosed() {
   await MOVE_CAR_STATUS.put('notify_status', 'closed', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
   await MOVE_CAR_STATUS.delete('session_expires_at');
   await MOVE_CAR_STATUS.delete('owner_location');
+  await MOVE_CAR_STATUS.delete('owner_message');
   await appendSessionHistory({
     sessionId,
     ownerToken,
@@ -128,6 +129,7 @@ async function purgeIfViewExpired() {
     await MOVE_CAR_STATUS.delete('session_owner_token');
     await MOVE_CAR_STATUS.delete('session_created_at');
     await MOVE_CAR_STATUS.delete('owner_location');
+    await MOVE_CAR_STATUS.delete('owner_message');
     await MOVE_CAR_STATUS.delete('notify_status');
     return true;
   }
@@ -268,6 +270,7 @@ async function handleNotify(request, url) {
     } else {
       // 新请求时清理上次车主位置，避免旧位置泄露
       await MOVE_CAR_STATUS.delete('owner_location');
+      await MOVE_CAR_STATUS.delete('owner_message');
       sessionId = generateSessionId();
       const createdAt = Date.now();
       const ownerToken = formatOwnerToken(sessionId, createdAt);
@@ -577,9 +580,11 @@ async function handleCheckStatus(request) {
   let status = await MOVE_CAR_STATUS.get('notify_status');
   if (sessionStatus === 'closed') status = 'closed';
   const ownerLocation = await MOVE_CAR_STATUS.get('owner_location');
+  const ownerMessage = await MOVE_CAR_STATUS.get('owner_message');
   return new Response(JSON.stringify({
     status: status || 'waiting',
     ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null,
+    ownerMessage: ownerMessage || null,
     sessionId: sessionId || null,
     sessionStatus: sessionStatus || null,
     sessionCompletedAt: sessionStatus === 'closed' ? (completedAtNum || null) : null
@@ -616,6 +621,7 @@ async function handleOwnerConfirmAction(request) {
     }
     const body = await request.json();
     const ownerLocation = body.location || null;
+    const ownerMessage = typeof body.message === 'string' ? body.message.trim().slice(0, 120) : '';
 
     if (ownerLocation) {
       const urls = generateMapUrls(ownerLocation.lat, ownerLocation.lng);
@@ -627,6 +633,11 @@ async function handleOwnerConfirmAction(request) {
       }), { expirationTtl: CONFIG.KV_TTL });
     } else {
       await MOVE_CAR_STATUS.delete('owner_location');
+    }
+    if (ownerMessage) {
+      await MOVE_CAR_STATUS.put('owner_message', ownerMessage, { expirationTtl: CONFIG.KV_TTL });
+    } else {
+      await MOVE_CAR_STATUS.delete('owner_message');
     }
 
     await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
@@ -1508,14 +1519,20 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       margin-bottom: 8px;
     }
 
-    .owner-card p {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
+      .owner-card p {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
 
-    .owner-card.hidden {
-      display: none;
-    }
+      .owner-msg {
+        margin-top: 10px;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .owner-card.hidden {
+        display: none;
+      }
 
     .session-card {
       display: flex;
@@ -1853,7 +1870,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.3.5.beta2</div>
+        v2.4.0</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -1888,6 +1905,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         <span style="font-size:56px; display:block; margin-bottom:16px">🎉</span>
         <h3>车主已收到通知</h3>
         <p>正在赶来，点击查看车主位置</p>
+        <p id="ownerMessage" class="owner-msg" style="display:none;"></p>
         <div id="ownerMapLinks" class="map-links" style="display:none">
           <a id="ownerAmapLink" href="#" class="map-btn amap spot-btn"><span>🗺️ 高德地图</span></a>
           <a id="ownerAppleLink" href="#" class="map-btn apple spot-btn"><span>🍎 Apple Maps</span></a>
@@ -2122,8 +2140,17 @@ let userLocation = null;
         const retryBtn = document.getElementById('retryBtn');
         const phoneBtn = document.getElementById('phoneBtn');
         const ownerCard = document.getElementById('ownerFeedback');
+        const ownerMsg = document.getElementById('ownerMessage');
         if (data.status === 'arriving') {
           if (ownerCard) ownerCard.classList.remove('hidden');
+          if (ownerMsg) {
+            if (data.ownerMessage) {
+              ownerMsg.innerText = '车主留言：' + data.ownerMessage;
+              ownerMsg.style.display = 'block';
+            } else {
+              ownerMsg.style.display = 'none';
+            }
+          }
           const waitingCard = document.getElementById('waitingCard');
           if (waitingCard) waitingCard.style.display = 'none';
           if (data.ownerLocation && data.ownerLocation.amapUrl) {
@@ -2145,6 +2172,14 @@ let userLocation = null;
         } else if (data.status === 'confirmed') {
           const fb = document.getElementById('ownerFeedback');
           if (fb) fb.classList.remove('hidden');
+          if (ownerMsg) {
+            if (data.ownerMessage) {
+              ownerMsg.innerText = '车主留言：' + data.ownerMessage;
+              ownerMsg.style.display = 'block';
+            } else {
+              ownerMsg.style.display = 'none';
+            }
+          }
           const waitingCard = document.getElementById('waitingCard');
           if (waitingCard) waitingCard.style.display = 'none';
           const sessionStatus = document.getElementById('sessionStatusUser');
@@ -2169,6 +2204,7 @@ let userLocation = null;
           setActionHint('会话已完成，需重新发起通知');
         } else if (data.status === 'closed') {
           if (ownerCard) ownerCard.classList.add('hidden');
+          if (ownerMsg) ownerMsg.style.display = 'none';
           const waitingCard = document.getElementById('waitingCard');
           if (waitingCard) waitingCard.style.display = 'none';
           const sessionStatus = document.getElementById('sessionStatusUser');
@@ -2185,6 +2221,7 @@ let userLocation = null;
           setActionHint('会话已结束，需重新发起通知');
         } else {
           if (ownerCard) ownerCard.classList.add('hidden');
+          if (ownerMsg) ownerMsg.style.display = 'none';
           const waitingCard = document.getElementById('waitingCard');
           if (waitingCard) waitingCard.style.display = '';
           if (retryBtn && retryBtn.disabled && retryBtn.innerText.includes('会话已')) {
@@ -3178,6 +3215,67 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
       line-height: 1.5;
     }
 
+    .owner-input {
+      margin-bottom: 18px;
+    }
+
+    .input-card {
+      padding: 0;
+    }
+
+    .input-card textarea {
+      width: 100%;
+      min-height: 90px;
+      padding: 14px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+
+    .input-card textarea::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.7;
+    }
+
+    .tags {
+      display: flex;
+      gap: 8px;
+      padding: 0 12px 14px 12px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .tags::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tag {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .owner-input .tags {
+      flex-wrap: wrap;
+      overflow-x: hidden;
+      gap: 8px 8px;
+    }
+
     /* Map section */
     .map-section {
       background: rgba(255, 255, 255, 0.08);
@@ -3458,6 +3556,15 @@ function renderOwnerPage(sessionToken, sessionId, apiBase) {
     <span class="emoji">👋</span>
     <h1>收到挪车请求</h1>
     <p class="subtitle">对方正在等待，请尽快确认</p>
+    <div class="card input-card owner-input">
+      <textarea id="ownerMsgInput" placeholder="给对方留言...（可选）"></textarea>
+      <div class="tags">
+        <div class="tag spot-btn" onclick="addOwnerTag('我已出发')"><span>🚗 已出发</span></div>
+        <div class="tag spot-btn" onclick="addOwnerTag('马上到')"><span>⏱️ 马上到</span></div>
+        <div class="tag spot-btn" onclick="addOwnerTag('请稍等')"><span>🙏 请稍等</span></div>
+        <div class="tag spot-btn" onclick="addOwnerTag('已在路上')"><span>🛣️ 在路上</span></div>
+      </div>
+    </div>
     <div id="mapArea" class="map-section">
       <p>📍 对方位置</p>
       <div class="map-links">
@@ -3565,9 +3672,19 @@ let ownerLocation = null;
       });
       document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+      function addOwnerTag(text) {
+        const input = document.getElementById('ownerMsgInput');
+        if (input) input.value = text;
+      }
+      function getOwnerMessage() {
+        const input = document.getElementById('ownerMsgInput');
+        if (!input) return '';
+        return input.value.trim().slice(0, 120);
+      }
       async function confirmMove() {
         const btn = document.getElementById('confirmBtn');
         const shareLocation = document.getElementById('shareLocationToggle').checked;
+        const ownerMessage = getOwnerMessage();
         
         btn.disabled = true;
         
@@ -3575,14 +3692,14 @@ let ownerLocation = null;
              btn.innerHTML = '<span>📍</span><span>获取位置中...</span>';
              if ('geolocation' in navigator) {
                navigator.geolocation.getCurrentPosition(
-                 async (pos) => { ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; await doConfirm(); },
-                 async (err) => { ownerLocation = null; await doConfirm(); },
+                 async (pos) => { ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; await doConfirm(ownerMessage); },
+                 async (err) => { ownerLocation = null; await doConfirm(ownerMessage); },
                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                );
-             } else { ownerLocation = null; await doConfirm(); }
+             } else { ownerLocation = null; await doConfirm(ownerMessage); }
         } else {
             ownerLocation = null;
-            await doConfirm();
+            await doConfirm(ownerMessage);
         }
       }
       async function clearOwnerLocation() {
@@ -3613,14 +3730,14 @@ let ownerLocation = null;
           setTimeout(() => { msg.innerText = ''; }, 2000);
         }
       }
-      async function doConfirm() {
+      async function doConfirm(ownerMessage) {
         const btn = document.getElementById('confirmBtn');
         btn.innerHTML = '<span>⏳</span><span>确认中...</span>';
         try {
           await fetch(API_BASE + '/owner-confirm?session=' + encodeURIComponent(SESSION_TOKEN), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ location: ownerLocation })
+            body: JSON.stringify({ location: ownerLocation, message: ownerMessage || '' })
           });
           if (btn) {
               btn.innerHTML = '<span>✅</span><span>已确认</span>';
