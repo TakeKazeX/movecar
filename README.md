@@ -1,4 +1,4 @@
-﻿# MoveCar - 挪车通知系统
+# MoveCar - 挪车通知系统
 
 基于 Cloudflare Workers 的智能挪车通知系统，扫码即可通知车主，保护双方隐私。
 
@@ -6,52 +6,45 @@
 
 | 请求者页面 | 车主页面 |
 |:---:|:---:|
-| [🔗 在线预览](https://htmlpreview.github.io/?https://github.com/lesnolie/movecar/blob/main/preview-requester.html) | [🔗 在线预览](https://htmlpreview.github.io/?https://github.com/lesnolie/movecar/blob/main/preview-owner.html) |
+| [🔗 在线预览](https://htmlpreview.github.io/?https://github.com/TakeKazeX/movecar/blob/main/preview-requester.html) | [🔗 在线预览](https://htmlpreview.github.io/?https://github.com/TakeKazeX/movecar/blob/main/preview-owner.html) |
 
-## 为什么需要它？
+## 亮点
 
-- 🚗 **被堵车却找不到车主** - 干着急没办法
-- 📱 **传统挪车码暴露电话** - 隐私泄露、骚扰电话不断
-- 😈 **恶意扫码骚扰** - 有人故意反复扫码打扰
-- 🤔 **路人好奇扫码** - 并不需要挪车却触发通知
-
-## 这个系统如何解决？
-
-- ✅ **不暴露电话号码** - 通过推送通知联系，保护隐私
-- ✅ **双向位置共享** - 车主可确认请求者确实在车旁
-- ✅ **无位置延迟 30 秒** - 降低恶意骚扰的动力
-- ✅ **免费部署** - Cloudflare Workers 免费额度完全够用
-- ✅ **无需服务器** - Serverless 架构，零运维成本
-
-## 支持的推送方式
-
-- 🔔 **Bark** (iOS 推荐)：支持「紧急 / 重要 / 警告」通知级别，即使开启勿扰模式也能收到提醒
-- 🐱 **MeoW** (鸿蒙 推荐)：因为是鸿蒙系统，所以推荐使用
-- 📢 **PushPlus** (微信推送)：适合习惯使用微信接收通知的用户
-- 📱 **Webhook**：原理相通，可替换为任意支持 Webhook 的推送服务
+- 🚗 扫码即用，不暴露电话号码
+- 📍 位置共享可选，关闭共享会触发 30 秒延迟发送并支持取消
+- 🧭 双向位置共享，附带高德地图与 Apple Maps 快捷入口
+- 🔔 支持 Bark、PushPlus、MeoW 三种推送方式
+- 🔁 会话内可再次通知，车主可留言、清除位置、终止会话
+- 🧾 车主会话总览页，显示活跃会话与最近历史
+- ☁️ 纯 Serverless，Cloudflare 免费额度即可覆盖日常使用
 
 ## 使用流程
 
-### 请求者（需要挪车的人）
+### 请求者
 
-1. 扫描车上的二维码，进入通知页面
-2. 填写留言（可选），如「挡住出口了」
-3. **确认位置信息**：
-   - 开启位置共享：页面下方会自动显示当前地图定位，方便确认位置准确性
-   - 关闭位置共享：通知将**延迟 30 秒**发送（防骚扰机制）
-4. 点击「一键通知车主」
-5. 等待车主确认，车主确认后可查看其共享的位置（如果车主选择共享）
+1. 扫描车上二维码进入页面。
+2. 输入留言内容（可选）。
+3. 选择是否共享位置，关闭共享会触发 30 秒延迟发送并可取消。
+4. 点击「一键通知车主」。
+5. 等待车主确认，确认后可查看车主位置与留言。
+6. 若无回应，可「再次通知」或使用 `PHONE_NUMBER` 直接联系。
 
 ### 车主
 
-1. 收到 Bark/MeoW/PushPlus 推送通知
-2. 点击通知进入确认页面，查看请求者位置（如有）
-3. **确认前往**：
-   - 可选择是否向对方共享我的位置（默认开启）
-   - 点击「我已知晓，正在前往」
-4. 对方收到确认反馈
+1. 收到 Bark / PushPlus / MeoW 推送通知。
+2. 点击通知进入确认页面。
+3. 可选择共享位置并添加留言。
+4. 点击「我已知晓，正在前往」，对方将收到确认反馈。
+5. 可清除自己的位置或终止会话。
 
-### 流程图
+### 会话规则
+
+- 会话标识自动生成，默认 10 分钟未完成会自动结束。
+- 会话结束后仍可查看约 10 分钟，随后自动清理。
+- 请求者与车主的位置及留言默认保留 1 小时。
+- 历史会话最多保留 5 条，默认保留 30 天。
+
+## 流程图
 
 ```
 请求者                              车主
@@ -69,6 +62,13 @@
   │                                  │
   ▼                                  ▼
 ```
+
+## 路径说明
+
+- `/` 请求者页面
+- `/<sessionId>` 恢复当前会话的请求者页面
+- `/<ownerToken>` 车主确认页面（推送中提供）
+- `/owner-home` 或 `/<PASSWORD>/owner-home` 车主会话总览
 
 ## 部署教程
 
@@ -99,22 +99,27 @@
 
 ### 第四步：配置环境变量
 
-1. Worker →「Settings」→「Variables and Secrets」
-2. 添加以下变量（任选其一或全部添加）：
-   - `BARK_URL`：Bark 推送地址（iOS推荐，如 `https://api.day.app/xxxxx`）
-   - `PUSHPLUS_TOKEN`：PushPlus 令牌（微信推送推荐，去 [pushplus.plus](http://www.pushplus.plus/) 获取）
-   - `MEOW_NICKNAME`：MeoW 昵称（使用 MeoW 推送必填）
-   - `MEOW_BASE_URL`：MeoW 服务地址（可选，默认为官方地址）
-   - `MEOW_MSG_TYPE`：MeoW 消息类型（可选，`text` 或 `html`，默认为 `text`）
-   - `MEOW_LOCAL_SEND`：设置为 `true` 可开启客户端发送（解决 Cloudflare IP 限制问题）
-   - `EXTERNAL_URL`：填入你的反代备案域名（例如 https://xx.xxx.com）-（可选，注意：带上https，末尾不要带斜杠)
-   - `PHONE_NUMBER`：备用联系电话（可选）
+至少配置一种推送方式：`BARK_URL`、`PUSHPLUS_TOKEN` 或 `MEOW_NICKNAME`。
+
+| 变量 | 是否必填 | 说明 | 示例 |
+|---|---|---|---|
+| `BARK_URL` | 可选 | Bark 推送地址 | `https://api.day.app/xxxxx` |
+| `PUSHPLUS_TOKEN` | 可选 | PushPlus 令牌 | `xxxxxx` |
+| `MEOW_NICKNAME` | 可选 | MeoW 昵称 | `mycar` |
+| `MEOW_BASE_URL` | 可选 | MeoW 服务地址，默认官方 | `https://api.chuckfang.com` |
+| `MEOW_MSG_TYPE` | 可选 | `text` 或 `html`，默认 `text` | `html` |
+| `MEOW_HTML_HEIGHT` | 可选 | MeoW HTML 消息高度，默认 260 | `320` |
+| `MEOW_LOCAL_SEND` | 可选 | `true` 时由前端本地发送 MeoW | `true` |
+| `EXTERNAL_URL` | 可选 | 通知里的确认链接域名，需 `https` 且无尾斜杠 | `https://nc.example.com` |
+| `PHONE_NUMBER` | 可选 | 备用联系电话，将显示在请求者页面 | `13000000000` |
+| `PASSWORD` | 可选 | 访问 `owner-home` 的路径前缀 | `mysecret` |
 
 ### 第五步：绑定域名（可选）
 
 1. Worker →「Settings」→「Domains & Routes」
 2. 点击「Add」→「Custom Domain」
 3. 输入你的域名，按提示完成 DNS 配置
+4. 如果使用自定义域名或反代，建议设置 `EXTERNAL_URL`
 
 ## 制作挪车码
 
@@ -146,18 +151,17 @@
 
 ## 安全设置（推荐）
 
-为防止境外恶意攻击，建议只允许中国地区访问：
+为防止境外恶意攻击，建议只允许中国地区访问。
 
 ### 方法一：使用 WAF 规则（推荐）
 
 1. 进入 Cloudflare Dashboard → 你的域名
 2. 左侧菜单点击「Security」→「WAF」
 3. 点击「Create rule」
-4. 规则设置：
-   - Rule name：`Block non-CN traffic`
-   - If incoming requests match：`Country does not equal China`
-   - Then：`Block`
-5. 点击「Deploy」
+4. Rule name 填 `Block non-CN traffic`
+5. If incoming requests match 选择 `Country does not equal China`
+6. Then 选择 `Block`
+7. 点击「Deploy」
 
 ### 方法二：在 Worker 代码中过滤
 
@@ -174,11 +178,8 @@ async function handleRequest(request) {
 }
 ```
 
-> ⚠️ 曾经被境外流量攻击过，强烈建议开启地区限制！
+> ⚠️ 曾经被境外流量攻击过，强烈建议开启地区限制。
 
 ## License
 
 MIT
-
-
-
