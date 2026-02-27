@@ -5,6 +5,63 @@ addEventListener('fetch', event => {
 const CONFIG = { KV_TTL: 3600 }
 const SESSION_TTL_SECONDS = 1800;
 const SESSION_VIEW_TTL_SECONDS = 600;
+const CN_PLATE_PROVINCES = new Set(Array.from('京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领警学港澳'));
+const CN_PLATE_REGION_RE = /^[A-HJ-NP-Z]$/;
+const CN_PLATE_SUFFIX_RE = /^[A-HJ-NP-Z0-9]{5,6}$/;
+
+function normalizePlateValue(value) {
+  return String(value || '').trim().toUpperCase().replace(/[\s\-_.·]/g, '');
+}
+
+function validateChinaPlateValue(rawPlate) {
+  const plate = normalizePlateValue(rawPlate);
+  if (plate.length < 7 || plate.length > 8) {
+    return { ok: false, code: 'LENGTH' };
+  }
+  const [province, region, ...tail] = Array.from(plate);
+  const suffix = tail.join('');
+  if (!CN_PLATE_PROVINCES.has(province)) {
+    return { ok: false, code: 'PROVINCE' };
+  }
+  if (!CN_PLATE_REGION_RE.test(region || '')) {
+    return { ok: false, code: 'REGION' };
+  }
+  if (!CN_PLATE_SUFFIX_RE.test(suffix)) {
+    return { ok: false, code: 'SUFFIX' };
+  }
+  if (!/\d/.test(suffix)) {
+    return { ok: false, code: 'DIGIT' };
+  }
+  return {
+    ok: true,
+    plate,
+    isNewEnergy: suffix.length === 6
+  };
+}
+
+function getConfiguredPlateRaw() {
+  if (typeof CAR_PLATE !== 'undefined' && CAR_PLATE) return String(CAR_PLATE);
+  return '';
+}
+
+function getConfiguredPlateRule() {
+  const raw = getConfiguredPlateRaw();
+  if (!raw) return { enabled: false, invalid: false };
+  const parsed = validateChinaPlateValue(raw);
+  if (!parsed.ok) return { enabled: false, invalid: true, reason: parsed.code };
+  const chars = Array.from(parsed.plate);
+  const region = chars.slice(0, 2).join('');
+  const suffix = chars.slice(2).join('');
+  const digits = (suffix.match(/\d/g) || []).join('');
+  if (!digits) return { enabled: false, invalid: true, reason: 'NO_DIGITS' };
+  return {
+    enabled: true,
+    invalid: false,
+    plate: parsed.plate,
+    region,
+    digits
+  };
+}
 
 function isTruthyEnv(val) {
   if (val === undefined || val === null) return false;
@@ -252,6 +309,19 @@ async function handleNotify(request, url) {
     await autoCloseIfExpired();
     const body = await request.json();
     const message = body.message || '车旁有人等待';
+    const configuredPlateRule = getConfiguredPlateRule();
+    if (configuredPlateRule.invalid) {
+      throw new Error('车牌变量 CAR_PLATE 格式错误，请检查配置');
+    }
+    let plate = '';
+    if (configuredPlateRule.enabled) {
+      const plateProof = body.plateProof && typeof body.plateProof === 'object' ? body.plateProof : {};
+      const inputPlate = normalizePlateValue(plateProof.plate || '');
+      if (inputPlate !== configuredPlateRule.plate) {
+        throw new Error('车牌验证失败');
+      }
+      plate = configuredPlateRule.plate;
+    }
     const location = body.location || null;
     const delayed = body.delayed || false;
     const incomingSessionId = body.sessionId || null;
@@ -304,6 +374,9 @@ async function handleNotify(request, url) {
 
     const dateStr = new Date().toLocaleDateString('sv-SE');
     let notifyBody = `💬 留言: ${message}\\n⌛️日期：${dateStr}`;
+    if (plate) {
+      notifyBody = `🚘 车牌: ${plate}\\n` + notifyBody;
+    }
 
     if (location && location.lat && location.lng) {
       const urls = generateMapUrls(location.lat, location.lng);
@@ -469,7 +542,9 @@ async function handleNotify(request, url) {
     console.error('Notify Error:', error);
     const publicErrors = [
       'KV 数据库未绑定！请在 Cloudflare 后台 Settings -> Bindings 中绑定 MOVE_CAR_STATUS',
-      '未配置通知方式！请在后台设置 BARK_URL、PUSHPLUS_TOKEN 或 MEOW_NICKNAME 变量'
+      '未配置通知方式！请在后台设置 BARK_URL、PUSHPLUS_TOKEN 或 MEOW_NICKNAME 变量',
+      '车牌变量 CAR_PLATE 格式错误，请检查配置',
+      '车牌验证失败'
     ];
     const publicMessage = publicErrors.includes(error.message) ? error.message : 'NOTIFY_FAILED';
     return new Response(JSON.stringify({ success: false, error: publicMessage }), {
@@ -775,6 +850,27 @@ function renderSessionNotFoundPage() {
 
 function renderMainPage(origin, apiBase, sessionPathId) {
   const phone = typeof PHONE_NUMBER !== 'undefined' ? PHONE_NUMBER : '';
+  const plateRule = getConfiguredPlateRule();
+  const verifySlotCount = plateRule.enabled ? Array.from(plateRule.plate).length : 8;
+  const plateVerifyInputsHtml = Array.from({ length: verifySlotCount }, (_, idx) => {
+    const isProvince = idx === 0;
+    const aria = `车牌第${idx + 1}位`;
+    const placeholder = isProvince ? '省' : 'X';
+    const cls = isProvince ? 'plate-box province plate-proof-box' : 'plate-box plate-proof-box';
+    const inputHtml = `<input class="${cls}" data-proof-index="${idx}" inputmode="text" maxlength="1" placeholder="${placeholder}" aria-label="${aria}">`;
+    if (idx === 1 && verifySlotCount > 2) {
+      return inputHtml + '<span class="plate-sep">·</span>';
+    }
+    return inputHtml;
+  }).join('');
+  const plateVerifyRule = {
+    enabled: plateRule.enabled,
+    plate: plateRule.enabled ? plateRule.plate : '',
+    length: verifySlotCount
+  };
+  const plateVerifyDesc = plateVerifyRule.enabled
+    ? '请输入完整车牌号'
+    : '未配置 CAR_PLATE，发送时将跳过车牌验证';
 
   const html = `
 <!DOCTYPE html>
@@ -835,6 +931,19 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       --toggle-checked-border: #16a34a;
       --toggle-knob: #ffffff;
 
+      --modal-overlay-bg: rgba(2, 6, 23, 0.6);
+      --modal-surface: rgba(15, 23, 42, 0.94);
+      --modal-border: rgba(148, 163, 184, 0.26);
+      --modal-text: #e2e8f0;
+      --modal-muted: #94a3b8;
+      --modal-shadow: 0 28px 70px rgba(2, 6, 23, 0.45);
+      --modal-btn-bg: rgba(30, 41, 59, 0.92);
+      --modal-btn-border: rgba(148, 163, 184, 0.28);
+      --modal-btn-text: #e2e8f0;
+      --modal-danger-bg: rgba(127, 29, 29, 0.88);
+      --modal-danger-border: rgba(239, 68, 68, 0.45);
+      --modal-danger-text: #fecaca;
+
       --fluid-1: rgba(139, 92, 246, 0.35);
       --fluid-2: rgba(236, 72, 153, 0.32);
       --fluid-3: rgba(59, 130, 246, 0.30);
@@ -873,6 +982,19 @@ function renderMainPage(origin, apiBase, sessionPathId) {
 
         --toggle-bg: rgba(15, 23, 42, 0.1);
         --toggle-border: rgba(15, 23, 42, 0.2);
+
+        --modal-overlay-bg: rgba(15, 23, 42, 0.45);
+        --modal-surface: #ffffff;
+        --modal-border: rgba(15, 23, 42, 0.12);
+        --modal-text: #0f172a;
+        --modal-muted: #475569;
+        --modal-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
+        --modal-btn-bg: #ffffff;
+        --modal-btn-border: rgba(15, 23, 42, 0.12);
+        --modal-btn-text: #0f172a;
+        --modal-danger-bg: #fee2e2;
+        --modal-danger-border: #fecaca;
+        --modal-danger-text: #b91c1c;
 
         --fluid-1: rgba(217, 70, 239, 0.45);
         --fluid-2: rgba(59, 130, 246, 0.40);
@@ -1197,6 +1319,81 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .input-card textarea::placeholder {
       color: var(--text-secondary);
       opacity: 0.7;
+    }
+
+    .plate-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .plate-meta.error {
+      color: #fca5a5;
+    }
+
+    .plate-grid {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: nowrap;
+      margin-top: 8px;
+    }
+
+    .plate-sep {
+      color: var(--text-secondary);
+      font-size: 18px;
+      font-weight: 700;
+      padding: 0 2px;
+      flex: 0 0 auto;
+    }
+
+    .plate-box {
+      width: 40px;
+      height: 46px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-primary);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+      caret-color: transparent;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      user-select: text;
+      -webkit-user-select: text;
+      flex: 0 0 auto;
+    }
+
+    .plate-box.province {
+      width: 46px;
+      font-size: 20px;
+    }
+
+    .plate-box:focus {
+      border-color: rgba(59, 130, 246, 0.9);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.24);
+    }
+
+    .plate-box.invalid {
+      border-color: rgba(239, 68, 68, 0.85);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+    }
+
+    .plate-proof-grid {
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-top: 4px;
+      padding-bottom: 2px;
+    }
+
+    .plate-proof-grid::-webkit-scrollbar {
+      display: none;
     }
 
     .tags {
@@ -1634,7 +1831,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.45);
+      background: var(--modal-overlay-bg);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1642,6 +1839,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       padding: 20px;
       opacity: 0;
       visibility: hidden;
+      pointer-events: none;
       transition: opacity 0.3s ease, visibility 0.3s ease;
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
@@ -1650,20 +1848,21 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-overlay.show {
       opacity: 1;
       visibility: visible;
+      pointer-events: auto;
     }
 
     .modal-box {
-      background: #ffffff;
-      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: var(--modal-surface);
+      border: 1px solid var(--modal-border);
       border-radius: 24px;
       padding: clamp(24px, 6vw, 32px);
-      max-width: 340px;
+      max-width: 460px;
       width: 100%;
       text-align: center;
       transform: scale(0.9);
       transition: transform 0.3s var(--ease-out-expo);
-      box-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
-      color: #0f172a;
+      box-shadow: var(--modal-shadow);
+      color: var(--modal-text);
     }
 
     .modal-overlay.show .modal-box {
@@ -1678,13 +1877,13 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     .modal-title {
       font-size: 18px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--modal-text);
       margin-bottom: 8px;
     }
 
     .modal-desc {
       font-size: 14px;
-      color: #475569;
+      color: var(--modal-muted);
       margin-bottom: 24px;
       line-height: 1.6;
     }
@@ -1701,11 +1900,11 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      border: 1px solid rgba(15, 23, 42, 0.12);
-      background: #ffffff;
-      color: #0f172a;
+      border: 1px solid var(--modal-btn-border);
+      background: var(--modal-btn-bg);
+      color: var(--modal-btn-text);
       transition: transform 0.2s ease;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22);
     }
 
     .modal-btn:active {
@@ -1713,15 +1912,15 @@ function renderMainPage(origin, apiBase, sessionPathId) {
     }
 
     .modal-btn-danger {
-      background: #fee2e2;
-      color: #b91c1c;
-      border-color: #fecaca;
+      background: var(--modal-danger-bg);
+      color: var(--modal-danger-text);
+      border-color: var(--modal-danger-border);
     }
 
     .modal-box .spot-btn {
-      background: #ffffff;
-      border: 1px solid rgba(15, 23, 42, 0.12);
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      background: var(--modal-btn-bg);
+      border: 1px solid var(--modal-btn-border);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
     }
@@ -1891,6 +2090,21 @@ function renderMainPage(origin, apiBase, sessionPathId) {
         </div>
       </div>
     </div>
+    <div id="plateVerifyModal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-icon">🪪</div>
+        <div class="modal-title">发送前验证车牌</div>
+        <div id="plateVerifyDesc" class="modal-desc">${plateVerifyDesc}</div>
+        <div id="plateVerifyGrid" class="plate-grid plate-proof-grid" aria-label="车牌验证输入">
+          ${plateVerifyRule.enabled ? plateVerifyInputsHtml : '<div class="plate-meta">未配置 CAR_PLATE</div>'}
+        </div>
+        <div id="plateVerifyError" class="plate-meta" style="min-height: 20px; margin-top: 10px;"></div>
+        <div class="modal-buttons">
+          <button class="modal-btn modal-btn-danger spot-btn" onclick="cancelPlateVerify()"><span>取消</span></button>
+          <button class="modal-btn spot-btn" onclick="confirmPlateVerify()"><span>验证并发送</span></button>
+        </div>
+      </div>
+    </div>
     <div id="delayModal" class="modal-overlay">
       <div class="modal-box">
         <div class="modal-icon">⏳</div>
@@ -1937,7 +2151,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.4.2</div>
+        v2.6.1.beta1</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -2013,6 +2227,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
 const API_BASE = '${apiBase}';
 const SESSION_PATH_ID = '${sessionPathId || ''}';
 const SESSION_VIEW_TTL_MS = ${SESSION_VIEW_TTL_SECONDS * 1000};
+const PLATE_VERIFY_RULE = ${JSON.stringify(plateVerifyRule)};
 let userLocation = null;
       let checkTimer = null;
       let delayTimer = null;
@@ -2031,6 +2246,9 @@ let userLocation = null;
       let lastCountdownVal = null;
       let map = null;
       let marker = null;
+      let pendingPlateProofForDelay = null;
+      let lastPlateProof = null;
+      let plateVerifyResolver = null;
 
       // WGS-84 to GCJ-02 function used in client side for map display
       function wgs84ToGcj02Client(lat, lng) {
@@ -2068,6 +2286,7 @@ let userLocation = null;
       window.onload = () => {
         const toggle = document.getElementById('shareLocationToggle');
         toggle.addEventListener('change', handleLocationToggle);
+        initPlateProofInputs();
         initActionControls();
         refreshSessionInfo();
         if (SESSION_PATH_ID) {
@@ -2397,6 +2616,183 @@ let userLocation = null;
           showToast('❌ 获取电话失败');
         }
       }
+      function getPlateProofInputs() {
+        return Array.from(document.querySelectorAll('.plate-proof-box'));
+      }
+      function setPlateVerifyError(text) {
+        const el = document.getElementById('plateVerifyError');
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.toggle('error', !!text);
+      }
+      function clearPlateProofInvalid() {
+        getPlateProofInputs().forEach((input) => input.classList.remove('invalid'));
+      }
+      function setPlateProofInvalidAll() {
+        clearPlateProofInvalid();
+        getPlateProofInputs().forEach((input) => {
+          if (input) input.classList.add('invalid');
+        });
+      }
+      function sanitizeProofChar(index, raw) {
+        if (raw === undefined || raw === null) return '';
+        const plain = String(raw).replace(/[\\s\\-_.·]/g, '');
+        if (!plain) return '';
+        if (index === 0) {
+          return Array.from(plain)[0] || '';
+        }
+        const upper = plain.toUpperCase();
+        for (const ch of Array.from(upper)) {
+          if (/^[A-HJ-NP-Z0-9]$/.test(ch)) return ch;
+        }
+        return '';
+      }
+      function focusProofInput(index) {
+        const inputs = getPlateProofInputs();
+        if (index < 0 || index >= inputs.length) return;
+        inputs[index].focus();
+      }
+      function focusNextProofInput(fromIndex) {
+        const inputs = getPlateProofInputs();
+        for (let i = Math.max(0, fromIndex); i < inputs.length; i++) {
+          if (!inputs[i].value) {
+            inputs[i].focus();
+            return;
+          }
+        }
+        if (inputs.length) {
+          inputs[inputs.length - 1].focus();
+        }
+      }
+      function fillPlateProofFromText(rawText) {
+        const inputs = getPlateProofInputs();
+        if (!inputs.length) return;
+        const chars = Array.from(String(rawText || '').replace(/[\\s\\-_.·]/g, ''));
+        inputs.forEach((input, idx) => {
+          input.value = sanitizeProofChar(idx, chars[idx] || '');
+        });
+        clearPlateProofInvalid();
+        setPlateVerifyError('');
+        focusNextProofInput(0);
+      }
+      function resetPlateVerifyModal() {
+        const inputs = getPlateProofInputs();
+        if (!inputs.length) {
+          setPlateVerifyError('');
+          return;
+        }
+        inputs.forEach((input) => {
+          input.value = '';
+          input.classList.remove('invalid');
+        });
+        setPlateVerifyError('');
+        focusProofInput(0);
+      }
+      function validatePlateProof(showFeedback) {
+        if (!PLATE_VERIFY_RULE.enabled) return null;
+        const inputs = getPlateProofInputs();
+        if (!inputs.length) return null;
+
+        const fail = () => {
+          if (showFeedback) {
+            setPlateProofInvalidAll();
+            setPlateVerifyError('车牌验证失败');
+            showToast('❌ 车牌验证失败');
+          }
+          return null;
+        };
+
+        const rawPlate = inputs.map((input) => input.value || '').join('');
+        if (rawPlate.length !== PLATE_VERIFY_RULE.length || inputs.some((input) => !input.value)) {
+          return fail();
+        }
+        const normalized = normalizePlateValue(rawPlate);
+        if (normalized !== PLATE_VERIFY_RULE.plate) {
+          return fail();
+        }
+        const valid = validateChinaPlateValue(normalized);
+        if (!valid.ok) return fail();
+
+        clearPlateProofInvalid();
+        setPlateVerifyError('');
+        return { plate: normalized };
+      }
+      function resolvePlateVerify(proof) {
+        hideModal('plateVerifyModal');
+        const resolver = plateVerifyResolver;
+        plateVerifyResolver = null;
+        if (resolver) resolver(proof);
+      }
+      function requestPlateVerify() {
+        if (!PLATE_VERIFY_RULE.enabled) return Promise.resolve(null);
+        if (plateVerifyResolver) return Promise.resolve(null);
+        resetPlateVerifyModal();
+        showModal('plateVerifyModal');
+        return new Promise((resolve) => {
+          plateVerifyResolver = resolve;
+        });
+      }
+      function cancelPlateVerify() {
+        resolvePlateVerify(null);
+      }
+      function confirmPlateVerify() {
+        const proof = validatePlateProof(true);
+        if (!proof) return;
+        resolvePlateVerify(proof);
+      }
+      function initPlateProofInputs() {
+        const grid = document.getElementById('plateVerifyGrid');
+        const inputs = getPlateProofInputs();
+        if (!grid || !inputs.length || grid.dataset.ready === '1') return;
+        inputs.forEach((input) => {
+          const index = Number(input.dataset.proofIndex || 0);
+          const orderedInputs = getPlateProofInputs();
+          input.autocomplete = 'off';
+          input.autocapitalize = 'characters';
+          input.spellcheck = false;
+          input.addEventListener('focus', () => {
+            setTimeout(() => input.select(), 0);
+          });
+          input.addEventListener('input', () => {
+            input.value = sanitizeProofChar(index, input.value);
+            if (input.value) focusNextProofInput(index + 1);
+            clearPlateProofInvalid();
+            setPlateVerifyError('');
+          });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              focusProofInput(index - 1);
+              return;
+            }
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              focusProofInput(index + 1);
+              return;
+            }
+            if (e.key === 'Backspace' && !input.value) {
+              e.preventDefault();
+              const prev = orderedInputs[index - 1];
+              if (prev) {
+                prev.value = '';
+                prev.focus();
+              }
+              return;
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              confirmPlateVerify();
+            }
+          });
+        });
+        grid.addEventListener('paste', (e) => {
+          const text = (e.clipboardData || window.clipboardData).getData('text');
+          if (!text) return;
+          e.preventDefault();
+          fillPlateProofFromText(text);
+        });
+        grid.dataset.ready = '1';
+      }
       function showModal(id) { document.getElementById(id).classList.add('show'); }
       function hideModal(id) { document.getElementById(id).classList.remove('show'); }
       function requestLocation() {
@@ -2512,8 +2908,9 @@ let userLocation = null;
         }
         return res;
       }
-      function startDelayCountdown() {
+      function startDelayCountdown(plateProof) {
         showModal('delayModal');
+        pendingPlateProofForDelay = plateProof;
         countdownVal = 30;
         lastCountdownVal = null;
         updateDelayMsg();
@@ -2523,7 +2920,8 @@ let userLocation = null;
           if (countdownVal <= 0) {
              clearInterval(delayTimer);
              hideModal('delayModal');
-             doSendNotify(null);
+             doSendNotify(null, pendingPlateProofForDelay);
+             pendingPlateProofForDelay = null;
           }
         }, 1000);
       }
@@ -2625,29 +3023,40 @@ let userLocation = null;
 
       function cancelDelay() {
         clearInterval(delayTimer);
+        pendingPlateProofForDelay = null;
         hideModal('delayModal');
       }
 
-      function sendNotify() {
+      async function sendNotify() {
         if (currentSessionId && (currentSessionStatus === 'active' || currentSessionStatus === 'arriving')) {
           showToast('已有进行中的会话，已为你打开');
           resumeSession();
           return;
         }
+        let plateProof = null;
+        if (PLATE_VERIFY_RULE.enabled) {
+          plateProof = await requestPlateVerify();
+          if (!plateProof) return;
+        }
         const shareLocation = document.getElementById('shareLocationToggle').checked;
         const locationToSend = shareLocation ? userLocation : null;
         
         if (locationToSend) {
-          doSendNotify(locationToSend);
+          doSendNotify(locationToSend, plateProof);
         } else {
-          startDelayCountdown();
+          startDelayCountdown(plateProof);
         }
       }
 
-      async function doSendNotify(locationToSend) {
+      async function doSendNotify(locationToSend, plateProof) {
         const btn = document.getElementById('notifyBtn');
         const msg = document.getElementById('msgInput').value;
         const delayed = false; // Client side delay already handled
+        const proof = PLATE_VERIFY_RULE.enabled ? (plateProof || lastPlateProof) : null;
+        if (PLATE_VERIFY_RULE.enabled && !proof) {
+          showToast('❌ 车牌验证信息缺失，请重试');
+          return;
+        }
         
         btn.disabled = true;
         btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
@@ -2655,12 +3064,13 @@ let userLocation = null;
           const res = await fetch(API_BASE + '/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: msg, location: locationToSend, delayed: delayed })
+            body: JSON.stringify({ message: msg, plateProof: proof, location: locationToSend, delayed: delayed })
           });
           const data = await res.json();
           if (res.ok && data.success) {
             if (delayed) showToast('⏳ 通知将延迟30秒发送'); // Should basically never happen with forced false
             else showToast('✅ 发送成功！');
+            if (proof) lastPlateProof = proof;
             if (data.localMeowRequest) {
               sendMeowLocal(data.localMeowRequest).catch((err) => {
                 console.error(err);
@@ -2730,6 +3140,10 @@ let userLocation = null;
           showToast('⏳ 请等待倒计时结束再提醒');
           return;
         }
+        if (PLATE_VERIFY_RULE.enabled && !lastPlateProof) {
+          showToast('❌ 首次通知未完成车牌验证，请重新发起');
+          return;
+        }
         let success = false;
         btn.disabled = true;
         btn.innerHTML = '<span>🚀</span><span>发送中...</span>';
@@ -2737,7 +3151,7 @@ let userLocation = null;
           const res = await fetch(API_BASE + '/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '再次通知：请尽快挪车', location: userLocation, sessionId: currentSessionId })
+            body: JSON.stringify({ message: '再次通知：请尽快挪车', plateProof: PLATE_VERIFY_RULE.enabled ? lastPlateProof : null, location: userLocation, sessionId: currentSessionId })
           });
           const data = await res.json();
           if (res.ok && data.success) {

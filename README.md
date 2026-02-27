@@ -25,7 +25,7 @@
 1. 扫描车上二维码进入页面。
 2. 输入留言内容（可选）。
 3. 选择是否共享位置，关闭共享会触发 30 秒延迟发送并可取消。
-4. 点击「一键通知车主」。
+4. 点击「一键通知车主」（若配置了 `CAR_PLATE`，会先弹窗验证完整车牌号）。
 5. 等待车主确认，确认后可查看车主位置与留言。
 6. 若无回应，可「再次通知」或使用 `PHONE_NUMBER` 直接联系。
 
@@ -99,7 +99,8 @@
 
 ### 第四步：配置环境变量
 
-至少配置一种推送方式：`BARK_URL`、`PUSHPLUS_TOKEN` 或 `MEOW_NICKNAME`。
+至少配置一种推送方式：`BARK_URL`、`PUSHPLUS_TOKEN` 或 `MEOW_NICKNAME`。  
+`CAR_PLATE` 可选：配置后会启用发送前车牌验证；不配置则跳过该步骤。
 
 | 变量 | 是否必填 | 说明 | 示例 |
 |---|---|---|---|
@@ -110,6 +111,7 @@
 | `MEOW_MSG_TYPE` | 可选 | `text` 或 `html`，默认 `text` | `html` |
 | `MEOW_HTML_HEIGHT` | 可选 | MeoW HTML 消息高度，默认 260 | `320` |
 | `MEOW_LOCAL_SEND` | 可选 | `true` 时由前端本地发送 MeoW | `true` |
+| `CAR_PLATE` | 可选 | 目标车牌，配置后会验证完整车牌号 | `粤AXQ3267` |
 | `EXTERNAL_URL` | 可选 | 通知里的确认链接域名，需 `https` 且无尾斜杠 | `https://nc.example.com` |
 | `PHONE_NUMBER` | 可选 | 备用联系电话，将显示在请求者页面 | `13000000000` |
 | `PASSWORD` | 可选 | 访问 `owner-home` 的路径前缀 | `mysecret` |
