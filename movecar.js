@@ -532,73 +532,22 @@ async function handleNotify(request, url) {
       );
     }
 
-    // 检测 MeoW 变量
+    // 检测 MeoW 变量（固定官方服务地址，仅维护 text 模式）
     if (typeof MEOW_NICKNAME !== 'undefined' && MEOW_NICKNAME) {
-      let meowBaseUrl = (typeof MEOW_BASE_URL !== 'undefined' && MEOW_BASE_URL)
-        ? MEOW_BASE_URL.replace(/\/$/, '')
-        : 'https://api.chuckfang.com';
-      if (!/^https?:\/\//i.test(meowBaseUrl)) {
-        meowBaseUrl = `https://${meowBaseUrl}`;
-      }
+      const meowBaseUrl = 'https://api.chuckfang.com';
       const meowLocalSend = isTruthyEnv(typeof MEOW_LOCAL_SEND !== 'undefined' ? MEOW_LOCAL_SEND : null);
-      const rawMsgType = (typeof MEOW_MSG_TYPE !== 'undefined' && MEOW_MSG_TYPE)
-        ? String(MEOW_MSG_TYPE).trim().toLowerCase()
-        : 'text';
-      const meowMsgType = rawMsgType === 'html' ? 'html' : 'text'; // 只允许 text / html
-      const parsedHeight = (typeof MEOW_HTML_HEIGHT !== 'undefined' && MEOW_HTML_HEIGHT !== null && MEOW_HTML_HEIGHT !== '')
-        ? Number(MEOW_HTML_HEIGHT)
-        : NaN;
-      const meowHtmlHeight = Number.isFinite(parsedHeight) ? parsedHeight : 260;
       const meowUrl = new URL(`${meowBaseUrl}/${encodeURIComponent(MEOW_NICKNAME)}`);
-      meowUrl.searchParams.set('msgType', meowMsgType);
-
-      const buildMeowContent = (includeLink) => {
-        if (meowMsgType === 'html') {
-          meowUrl.searchParams.set('htmlHeight', String(meowHtmlHeight));
-          const htmlBody = notifyBodyHtml;
-          const linkHtml = includeLink
-            ? `<br><br><a href="${escapeHtml(confirmUrl)}">👉 点击此处处理挪车请求</a>`
-            : '';
-          return `
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { font-family: -apple-system, sans-serif; padding: 16px; margin: 0; line-height: 1.5; color: #333; }
-  a { color: #007bff; text-decoration: none; display: inline-block; margin-top: 10px; font-weight: bold; }
-</style>
-</head>
-<body>
-  ${htmlBody}
-  ${linkHtml}
-</body>
-</html>`;
-        }
-        const textBody = notifyBody;
-        return includeLink
-          ? `${textBody}\n\n👉 点击此处处理挪车请求: ${confirmUrl}`
-          : textBody;
-      };
-
-      const includeLink = true;
-      const meowContent = buildMeowContent(includeLink);
-      if (meowMsgType === 'html') {
-        meowUrl.searchParams.set('htmlHeight', String(meowHtmlHeight));
-      }
-
+      meowUrl.searchParams.set('msgType', 'text');
+      const meowContent = `${notifyBody}\n\n👉 点击此处处理挪车请求: ${confirmUrl}`;
       const meowRequest = {
         url: meowUrl.toString(),
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: {
           title: '🚗 挪车请求',
-          msg: meowContent
+          msg: meowContent,
+          url: confirmUrl // 某些客户端可能优先读取 body 中的 url
         }
       };
-      if (includeLink) {
-        meowRequest.body.url = confirmUrl; // 某些客户端可能优先读取 body 中的 url
-      }
 
       if (meowLocalSend) {
         localMeowRequest = meowRequest;
@@ -2232,7 +2181,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.7.0.beta1</div>
+        v2.7.1</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
