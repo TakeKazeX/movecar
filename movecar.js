@@ -5,9 +5,16 @@ addEventListener('fetch', event => {
 const CONFIG = { KV_TTL: 3600 }
 const SESSION_TTL_SECONDS = 1800;
 const SESSION_VIEW_TTL_SECONDS = 600;
+const MESSAGE_MAX_LENGTH = 120;
 const CN_PLATE_PROVINCES = new Set(Array.from('京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领警学港澳'));
 const CN_PLATE_REGION_RE = /^[A-HJ-NP-Z]$/;
 const CN_PLATE_SUFFIX_RE = /^[A-HJ-NP-Z0-9]{5,6}$/;
+const RESPONSE_SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Cross-Origin-Resource-Policy': 'same-origin'
+};
 
 function normalizePlateValue(value) {
   return String(value || '').trim().toUpperCase().replace(/[\s\-_.·]/g, '');
@@ -49,18 +56,95 @@ function getConfiguredPlateRule() {
   if (!raw) return { enabled: false, invalid: false };
   const parsed = validateChinaPlateValue(raw);
   if (!parsed.ok) return { enabled: false, invalid: true, reason: parsed.code };
-  const chars = Array.from(parsed.plate);
-  const region = chars.slice(0, 2).join('');
-  const suffix = chars.slice(2).join('');
-  const digits = (suffix.match(/\d/g) || []).join('');
-  if (!digits) return { enabled: false, invalid: true, reason: 'NO_DIGITS' };
   return {
     enabled: true,
     invalid: false,
-    plate: parsed.plate,
-    region,
-    digits
+    plate: parsed.plate
   };
+}
+
+function withSecurityHeaders(headersLike) {
+  const headers = new Headers(headersLike || {});
+  for (const [k, v] of Object.entries(RESPONSE_SECURITY_HEADERS)) {
+    if (!headers.has(k)) headers.set(k, v);
+  }
+  return headers;
+}
+
+function jsonResponse(payload, status = 200, headersLike) {
+  const headers = withSecurityHeaders(headersLike);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  if (!headers.has('Pragma')) headers.set('Pragma', 'no-cache');
+  return new Response(JSON.stringify(payload), { status, headers });
+}
+
+function htmlResponse(html, status = 200, headersLike) {
+  const headers = withSecurityHeaders(headersLike);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'text/html;charset=UTF-8');
+  if (!headers.has('Cache-Control')) headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  return new Response(html, { status, headers });
+}
+
+function buildSessionCookie(sessionId) {
+  return `mc_session=${encodeURIComponent(sessionId)}; Max-Age=${SESSION_VIEW_TTL_SECONDS}; Path=/; SameSite=Lax; Secure; HttpOnly`;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeUserMessage(value, fallback = '') {
+  const clean = String(value || '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MESSAGE_MAX_LENGTH);
+  if (clean) return clean;
+  return fallback;
+}
+
+function normalizeLocationPayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const lat = Number(payload.lat);
+  const lng = Number(payload.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return {
+    lat: Number(lat.toFixed(7)),
+    lng: Number(lng.toFixed(7))
+  };
+}
+
+function safeJsonParse(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return null;
+  }
+}
+
+function resolveExternalBaseDomain(origin) {
+  const raw = (typeof EXTERNAL_URL !== 'undefined' && EXTERNAL_URL)
+    ? String(EXTERNAL_URL).trim()
+    : '';
+  if (!raw) return origin;
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (parsed.protocol !== 'https:') return origin;
+    const safePath = parsed.pathname && parsed.pathname !== '/'
+      ? parsed.pathname.replace(/\/+$/, '')
+      : '';
+    return `${parsed.origin}${safePath}`;
+  } catch (e) {
+    return origin;
+  }
 }
 
 function isTruthyEnv(val) {
@@ -123,8 +207,10 @@ function formatHomeStatus(status) {
 
 async function resolveSessionFromRequest(request) {
   if (typeof MOVE_CAR_STATUS === 'undefined') return null;
-  const currentSession = await MOVE_CAR_STATUS.get('session_id');
-  const ownerToken = await MOVE_CAR_STATUS.get('session_owner_token');
+  const [currentSession, ownerToken] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_id'),
+    MOVE_CAR_STATUS.get('session_owner_token')
+  ]);
   const param = new URL(request.url).searchParams.get('session');
   const cookieSession = getCookie(request, 'mc_session');
   if (param && (param === currentSession || param === ownerToken)) return currentSession;
@@ -148,16 +234,20 @@ async function markSessionClosed() {
   if (typeof MOVE_CAR_STATUS === 'undefined') return;
   const sessionId = await MOVE_CAR_STATUS.get('session_id');
   if (!sessionId) return;
-  const ownerToken = await MOVE_CAR_STATUS.get('session_owner_token');
-  const createdAt = await MOVE_CAR_STATUS.get('session_created_at');
+  const [ownerToken, createdAt] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_owner_token'),
+    MOVE_CAR_STATUS.get('session_created_at')
+  ]);
   const closedAt = Date.now();
-  await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-  await MOVE_CAR_STATUS.put('session_status', 'closed', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-  await MOVE_CAR_STATUS.put('session_completed_at', String(closedAt), { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-  await MOVE_CAR_STATUS.put('notify_status', 'closed', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-  await MOVE_CAR_STATUS.delete('session_expires_at');
-  await MOVE_CAR_STATUS.delete('owner_location');
-  await MOVE_CAR_STATUS.delete('owner_message');
+  await Promise.all([
+    MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+    MOVE_CAR_STATUS.put('session_status', 'closed', { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+    MOVE_CAR_STATUS.put('session_completed_at', String(closedAt), { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+    MOVE_CAR_STATUS.put('notify_status', 'closed', { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+    MOVE_CAR_STATUS.delete('session_expires_at'),
+    MOVE_CAR_STATUS.delete('owner_location'),
+    MOVE_CAR_STATUS.delete('owner_message')
+  ]);
   await appendSessionHistory({
     sessionId,
     ownerToken,
@@ -168,8 +258,10 @@ async function markSessionClosed() {
 
 async function autoCloseIfExpired() {
   if (typeof MOVE_CAR_STATUS === 'undefined') return;
-  const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
-  const expiresAt = await MOVE_CAR_STATUS.get('session_expires_at');
+  const [sessionStatus, expiresAt] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_status'),
+    MOVE_CAR_STATUS.get('session_expires_at')
+  ]);
   if (sessionStatus !== 'closed' && expiresAt && Date.now() > Number(expiresAt)) {
     await markSessionClosed();
   }
@@ -177,17 +269,21 @@ async function autoCloseIfExpired() {
 
 async function purgeIfViewExpired() {
   if (typeof MOVE_CAR_STATUS === 'undefined') return false;
-  const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
-  const completedAt = await MOVE_CAR_STATUS.get('session_completed_at');
+  const [sessionStatus, completedAt] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_status'),
+    MOVE_CAR_STATUS.get('session_completed_at')
+  ]);
   if (sessionStatus === 'closed' && completedAt && Date.now() - Number(completedAt) > SESSION_VIEW_TTL_SECONDS * 1000) {
-    await MOVE_CAR_STATUS.delete('session_id');
-    await MOVE_CAR_STATUS.delete('session_status');
-    await MOVE_CAR_STATUS.delete('session_completed_at');
-    await MOVE_CAR_STATUS.delete('session_owner_token');
-    await MOVE_CAR_STATUS.delete('session_created_at');
-    await MOVE_CAR_STATUS.delete('owner_location');
-    await MOVE_CAR_STATUS.delete('owner_message');
-    await MOVE_CAR_STATUS.delete('notify_status');
+    await Promise.all([
+      MOVE_CAR_STATUS.delete('session_id'),
+      MOVE_CAR_STATUS.delete('session_status'),
+      MOVE_CAR_STATUS.delete('session_completed_at'),
+      MOVE_CAR_STATUS.delete('session_owner_token'),
+      MOVE_CAR_STATUS.delete('session_created_at'),
+      MOVE_CAR_STATUS.delete('owner_location'),
+      MOVE_CAR_STATUS.delete('owner_message'),
+      MOVE_CAR_STATUS.delete('notify_status')
+    ]);
     return true;
   }
   return false;
@@ -236,7 +332,7 @@ async function handleRequest(request) {
     if (apiName === 'check-status') {
       return handleCheckStatus(request);
     }
-    return new Response('Not Found', { status: 404 });
+    return jsonResponse({ error: 'NOT_FOUND' }, 404);
   }
 
   if (password && segments[0] === password && segments[1] === 'owner-home' && segments.length === 2) {
@@ -302,13 +398,12 @@ function generateMapUrls(lat, lng) {
 // --- 核心修改：支持 PushPlus 和 Bark ---
 async function handleNotify(request, url) {
   try {
-    // 1. 检查 KV 是否绑定
     if (typeof MOVE_CAR_STATUS === 'undefined') {
       throw new Error('KV 数据库未绑定！请在 Cloudflare 后台 Settings -> Bindings 中绑定 MOVE_CAR_STATUS');
     }
     await autoCloseIfExpired();
     const body = await request.json();
-    const message = body.message || '车旁有人等待';
+    const message = normalizeUserMessage(body.message, '车旁有人等待');
     const configuredPlateRule = getConfiguredPlateRule();
     if (configuredPlateRule.invalid) {
       throw new Error('车牌变量 CAR_PLATE 格式错误，请检查配置');
@@ -322,43 +417,42 @@ async function handleNotify(request, url) {
       }
       plate = configuredPlateRule.plate;
     }
-    const location = body.location || null;
-    const delayed = body.delayed || false;
-    const incomingSessionId = body.sessionId || null;
+    const location = normalizeLocationPayload(body.location);
+    const delayed = !!body.delayed;
+    const incomingSessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : null;
 
-    const currentSession = await MOVE_CAR_STATUS.get('session_id');
-    const currentStatus = await MOVE_CAR_STATUS.get('session_status');
+    const [currentSession, currentStatus] = await Promise.all([
+      MOVE_CAR_STATUS.get('session_id'),
+      MOVE_CAR_STATUS.get('session_status')
+    ]);
     let sessionId = null;
     const reuseSession = incomingSessionId && currentSession && incomingSessionId === currentSession && currentStatus !== 'closed';
     const nextSessionStatus = reuseSession && currentStatus === 'arriving' ? 'arriving' : 'active';
 
     if (reuseSession) {
       sessionId = currentSession;
-      await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.put('session_status', nextSessionStatus, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.delete('session_completed_at');
+      await Promise.all([
+        MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.put('session_status', nextSessionStatus, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.delete('session_completed_at')
+      ]);
     } else {
-      // 新请求时清理上次车主位置，避免旧位置泄露
-      await MOVE_CAR_STATUS.delete('owner_location');
-      await MOVE_CAR_STATUS.delete('owner_message');
       sessionId = generateSessionId();
       const createdAt = Date.now();
       const ownerToken = formatOwnerToken(sessionId, createdAt);
-      await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.put('session_status', 'active', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.put('session_created_at', String(createdAt), { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.put('session_owner_token', ownerToken, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-      await MOVE_CAR_STATUS.delete('session_completed_at');
+      await Promise.all([
+        MOVE_CAR_STATUS.delete('owner_location'),
+        MOVE_CAR_STATUS.delete('owner_message'),
+        MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.put('session_status', 'active', { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.put('session_created_at', String(createdAt), { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.put('session_owner_token', ownerToken, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+        MOVE_CAR_STATUS.delete('session_completed_at')
+      ]);
     }
     await MOVE_CAR_STATUS.put('session_expires_at', String(Date.now() + SESSION_VIEW_TTL_SECONDS * 1000), { expirationTtl: SESSION_VIEW_TTL_SECONDS });
 
-    // --- 修改前 ---
-    //  const confirmUrl = url.origin + '/owner-confirm';
-
-    // --- 修改后：优先读取环境变量中的域名，如果没有配置则回退到原始域名 ---
-    const baseDomain = (typeof EXTERNAL_URL !== 'undefined' && EXTERNAL_URL)
-      ? EXTERNAL_URL.replace(/\/$/, "") // 去掉末尾斜杠
-      : url.origin;
+    const baseDomain = resolveExternalBaseDomain(url.origin);
 
     let ownerToken = await MOVE_CAR_STATUS.get('session_owner_token');
     if (!ownerToken) {
@@ -373,14 +467,14 @@ async function handleNotify(request, url) {
     const confirmUrlEncoded = encodeURIComponent(confirmUrl);
 
     const dateStr = new Date().toLocaleDateString('sv-SE');
-    let notifyBody = `💬 留言: ${message}\\n⌛️日期：${dateStr}`;
+    let notifyBody = `💬 留言: ${message}\n⌛️日期：${dateStr}`;
     if (plate) {
-      notifyBody = `🚘 车牌: ${plate}\\n` + notifyBody;
+      notifyBody = `🚘 车牌: ${plate}\n` + notifyBody;
     }
 
-    if (location && location.lat && location.lng) {
+    if (location) {
       const urls = generateMapUrls(location.lat, location.lng);
-      notifyBody += '\\n📍 已附带位置信息，点击查看';
+      notifyBody += '\n📍 已附带位置信息，点击查看';
 
       await MOVE_CAR_STATUS.put('requester_location', JSON.stringify({
         lat: location.lat,
@@ -388,8 +482,9 @@ async function handleNotify(request, url) {
         ...urls
       }), { expirationTtl: CONFIG.KV_TTL });
     } else {
-      notifyBody += '\\n⚠️ 未提供位置信息';
+      notifyBody += '\n⚠️ 未提供位置信息';
     }
+    const notifyBodyHtml = escapeHtml(notifyBody).replace(/\n/g, '<br>');
 
     const notifyStatus = reuseSession && currentStatus === 'arriving' ? 'arriving' : 'waiting';
     await MOVE_CAR_STATUS.put('notify_status', notifyStatus, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
@@ -403,7 +498,7 @@ async function handleNotify(request, url) {
     const ensureNotifyOk = async (responsePromise, serviceName) => {
       try {
         const response = await responsePromise;
-        const text = await response.text(); // Always read response
+        const text = await response.text();
         if (!response.ok) {
           throw new Error(`${serviceName} failed (${response.status}): ${text}`);
         }
@@ -421,9 +516,9 @@ async function handleNotify(request, url) {
 
     // 检测 PushPlus 变量
     if (typeof PUSHPLUS_TOKEN !== 'undefined' && PUSHPLUS_TOKEN) {
-      const pushPlusContent = notifyBody.replace(/\\n/g, '<br>') + `<br><br><a href="${confirmUrl}">👉 点击此处处理挪车请求</a>`;
+      const pushPlusContent = notifyBodyHtml + `<br><br><a href="${escapeHtml(confirmUrl)}">👉 点击此处处理挪车请求</a>`;
       notificationTasks.push(
-        ensureNotifyOk(fetch('http://www.pushplus.plus/send', {
+        ensureNotifyOk(fetch('https://www.pushplus.plus/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -460,9 +555,9 @@ async function handleNotify(request, url) {
       const buildMeowContent = (includeLink) => {
         if (meowMsgType === 'html') {
           meowUrl.searchParams.set('htmlHeight', String(meowHtmlHeight));
-          const htmlBody = notifyBody.replace(/\\n/g, '<br>');
+          const htmlBody = notifyBodyHtml;
           const linkHtml = includeLink
-            ? `<br><br><a href="${confirmUrl}">👉 点击此处处理挪车请求</a>`
+            ? `<br><br><a href="${escapeHtml(confirmUrl)}">👉 点击此处处理挪车请求</a>`
             : '';
           return `
 <!DOCTYPE html>
@@ -481,7 +576,7 @@ async function handleNotify(request, url) {
 </body>
 </html>`;
         }
-        const textBody = notifyBody.replace(/\\n/g, '\n');
+        const textBody = notifyBody;
         return includeLink
           ? `${textBody}\n\n👉 点击此处处理挪车请求: ${confirmUrl}`
           : textBody;
@@ -523,22 +618,31 @@ async function handleNotify(request, url) {
       throw new Error('未配置通知方式！请在后台设置 BARK_URL、PUSHPLUS_TOKEN 或 MEOW_NICKNAME 变量');
     }
 
-    const results = notificationTasks.length ? await Promise.all(notificationTasks) : [];
+    const results = notificationTasks.length ? await Promise.allSettled(notificationTasks) : [];
+    const successCount = results.filter((item) => item.status === 'fulfilled').length;
+    if (!localMeowRequest && successCount === 0) {
+      const firstErr = results.find((item) => item.status === 'rejected');
+      const reason = firstErr && firstErr.reason && firstErr.reason.message
+        ? firstErr.reason.message
+        : 'NOTIFY_FAILED';
+      throw new Error(reason);
+    }
+    const failedServices = results
+      .filter((item) => item.status === 'rejected')
+      .map((item) => item.reason && item.reason.message ? item.reason.message : 'UNKNOWN');
+    if (failedServices.length) {
+      console.warn('Notify partial failures:', failedServices.join(' | '));
+    }
 
     const responsePayload = {
       success: true,
       sessionId: sessionId
     };
+    if (failedServices.length) responsePayload.partialFailure = true;
     if (localMeowRequest) responsePayload.localMeowRequest = localMeowRequest;
-    return new Response(JSON.stringify(responsePayload), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': `mc_session=${sessionId}; Max-Age=${SESSION_VIEW_TTL_SECONDS}; Path=/; SameSite=Lax`
-      }
-    });
+    return jsonResponse(responsePayload, 200, { 'Set-Cookie': buildSessionCookie(sessionId) });
 
   } catch (error) {
-    // 返回具体错误信息给前端，方便调试
     console.error('Notify Error:', error);
     const publicErrors = [
       'KV 数据库未绑定！请在 Cloudflare 后台 Settings -> Bindings 中绑定 MOVE_CAR_STATUS',
@@ -547,207 +651,184 @@ async function handleNotify(request, url) {
       '车牌验证失败'
     ];
     const publicMessage = publicErrors.includes(error.message) ? error.message : 'NOTIFY_FAILED';
-    return new Response(JSON.stringify({ success: false, error: publicMessage }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: false, error: publicMessage }, 500);
   }
 }
 
 async function handleGetLocation(request) {
-  if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+  if (typeof MOVE_CAR_STATUS === 'undefined') return jsonResponse({ error: 'KV_NOT_BOUND' }, 500);
   const sessionId = await resolveSessionFromRequest(request);
   if (!sessionId) {
-    return new Response(JSON.stringify({ error: 'SESSION_INVALID' }), { status: 404 });
+    return jsonResponse({ error: 'SESSION_INVALID' }, 404);
   }
   const data = await MOVE_CAR_STATUS.get('requester_location');
   if (data) {
-    return new Response(data, { headers: { 'Content-Type': 'application/json' } });
+    const parsed = safeJsonParse(data);
+    if (parsed) return jsonResponse(parsed);
   }
-  return new Response(JSON.stringify({ error: 'No location' }), { status: 404 });
+  return jsonResponse({ error: 'No location' }, 404);
 }
 
 function handleGetPhone() {
-  const phone = typeof PHONE_NUMBER !== 'undefined' ? PHONE_NUMBER : '';
+  const phone = typeof PHONE_NUMBER !== 'undefined' ? String(PHONE_NUMBER).trim() : '';
   if (!phone) {
-    return new Response(JSON.stringify({ success: false, error: 'NO_PHONE' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: false, error: 'NO_PHONE' }, 404);
   }
-  return new Response(JSON.stringify({ success: true, phone: phone }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+  return jsonResponse({ success: true, phone: phone });
 }
 
 async function handleGetSession(request) {
   if (typeof MOVE_CAR_STATUS === 'undefined') {
-    return new Response(JSON.stringify({ sessionId: null }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ sessionId: null });
   }
   const url = new URL(request.url);
   const role = url.searchParams.get('role');
   const requestedSession = url.searchParams.get('session');
   await autoCloseIfExpired();
   if (await purgeIfViewExpired()) {
-    return new Response(JSON.stringify({ sessionId: null, sessionStatus: null, sessionCompletedAt: null }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ sessionId: null, sessionStatus: null, sessionCompletedAt: null });
   }
-  const sessionId = await MOVE_CAR_STATUS.get('session_id');
-  const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
-  const sessionCompletedAt = await MOVE_CAR_STATUS.get('session_completed_at');
+  const [sessionId, sessionStatus, sessionCompletedAt, ownerToken] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_id'),
+    MOVE_CAR_STATUS.get('session_status'),
+    MOVE_CAR_STATUS.get('session_completed_at'),
+    MOVE_CAR_STATUS.get('session_owner_token')
+  ]);
   const completedAtNum = sessionCompletedAt ? Number(sessionCompletedAt) : null;
   if (role === 'owner') {
-    const ownerToken = await MOVE_CAR_STATUS.get('session_owner_token');
     if (!ownerToken || (requestedSession && ownerToken !== requestedSession)) {
-      return new Response(JSON.stringify({ sessionId: null, sessionStatus: null, sessionCompletedAt: null }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ sessionId: null, sessionStatus: null, sessionCompletedAt: null });
     }
   } else {
     const cookieSession = getCookie(request, 'mc_session');
     if (!sessionId || !cookieSession || cookieSession !== sessionId) {
-      return new Response(JSON.stringify({ sessionId: null, sessionStatus: null, sessionCompletedAt: null }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ sessionId: null, sessionStatus: null, sessionCompletedAt: null });
     }
   }
   const safeCompletedAt = sessionStatus === 'closed' ? (completedAtNum || null) : null;
-  return new Response(JSON.stringify({ sessionId: sessionId || null, sessionStatus: sessionStatus || null, sessionCompletedAt: safeCompletedAt }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+  return jsonResponse({ sessionId: sessionId || null, sessionStatus: sessionStatus || null, sessionCompletedAt: safeCompletedAt });
 }
 
 async function handleCheckStatus(request) {
   if (typeof MOVE_CAR_STATUS === 'undefined') {
-    return new Response(JSON.stringify({ status: 'error', error: 'KV_NOT_BOUND' }), { headers: { 'Content-Type': 'application/json' } });
+    return jsonResponse({ status: 'error', error: 'KV_NOT_BOUND' });
   }
   await autoCloseIfExpired();
   if (await purgeIfViewExpired()) {
-    return new Response(JSON.stringify({
+    return jsonResponse({
       status: 'waiting',
       ownerLocation: null,
       sessionId: null,
       sessionStatus: null,
       sessionCompletedAt: null
-    }), {
-      headers: { 'Content-Type': 'application/json' }
     });
   }
-  const sessionId = await MOVE_CAR_STATUS.get('session_id');
-  const sessionStatus = await MOVE_CAR_STATUS.get('session_status');
-  const sessionCompletedAt = await MOVE_CAR_STATUS.get('session_completed_at');
+  const [sessionId, sessionStatus, sessionCompletedAt, notifyStatus, ownerLocationRaw, ownerMessage] = await Promise.all([
+    MOVE_CAR_STATUS.get('session_id'),
+    MOVE_CAR_STATUS.get('session_status'),
+    MOVE_CAR_STATUS.get('session_completed_at'),
+    MOVE_CAR_STATUS.get('notify_status'),
+    MOVE_CAR_STATUS.get('owner_location'),
+    MOVE_CAR_STATUS.get('owner_message')
+  ]);
   const completedAtNum = sessionCompletedAt ? Number(sessionCompletedAt) : null;
   const cookieSession = getCookie(request, 'mc_session');
   if (!sessionId || !cookieSession || cookieSession !== sessionId) {
-    return new Response(JSON.stringify({
+    return jsonResponse({
       status: 'waiting',
       ownerLocation: null,
       sessionId: null,
       sessionStatus: null,
       sessionCompletedAt: null
-    }), {
-      headers: { 'Content-Type': 'application/json' }
     });
   }
-  let status = await MOVE_CAR_STATUS.get('notify_status');
+  let status = notifyStatus || 'waiting';
+  if (!notifyStatus && sessionStatus === 'arriving') status = 'arriving';
   if (sessionStatus === 'closed') status = 'closed';
-  const ownerLocation = await MOVE_CAR_STATUS.get('owner_location');
-  const ownerMessage = await MOVE_CAR_STATUS.get('owner_message');
-  return new Response(JSON.stringify({
-    status: status || 'waiting',
-    ownerLocation: ownerLocation ? JSON.parse(ownerLocation) : null,
+  return jsonResponse({
+    status: status,
+    ownerLocation: safeJsonParse(ownerLocationRaw),
     ownerMessage: ownerMessage || null,
     sessionId: sessionId || null,
     sessionStatus: sessionStatus || null,
     sessionCompletedAt: sessionStatus === 'closed' ? (completedAtNum || null) : null
-  }), {
-    headers: { 'Content-Type': 'application/json' }
   });
 }
 
 async function handleTerminateSession(request) {
   try {
-    if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+    if (typeof MOVE_CAR_STATUS === 'undefined') return jsonResponse({ error: 'KV_NOT_BOUND' }, 500);
     const sessionId = await resolveSessionFromRequest(request);
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: 'SESSION_INVALID' }), { status: 404 });
+      return jsonResponse({ error: 'SESSION_INVALID' }, 404);
     }
     await markSessionClosed();
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: true });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: false }, 500);
   }
 }
 
 async function handleOwnerConfirmAction(request) {
   try {
-    if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+    if (typeof MOVE_CAR_STATUS === 'undefined') return jsonResponse({ error: 'KV_NOT_BOUND' }, 500);
     const sessionId = await resolveSessionFromRequest(request);
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: 'SESSION_INVALID' }), { status: 404 });
+      return jsonResponse({ error: 'SESSION_INVALID' }, 404);
+    }
+    const [currentSessionId, sessionStatus] = await Promise.all([
+      MOVE_CAR_STATUS.get('session_id'),
+      MOVE_CAR_STATUS.get('session_status')
+    ]);
+    if (!currentSessionId || currentSessionId !== sessionId || sessionStatus === 'closed') {
+      return jsonResponse({ success: false, error: 'SESSION_CLOSED' }, 409);
     }
     const body = await request.json();
-    const ownerLocation = body.location || null;
-    const ownerMessage = typeof body.message === 'string' ? body.message.trim().slice(0, 120) : '';
+    const ownerLocation = normalizeLocationPayload(body.location);
+    const ownerMessage = normalizeUserMessage(body.message, '');
 
-    if (ownerLocation) {
-      const urls = generateMapUrls(ownerLocation.lat, ownerLocation.lng);
-      await MOVE_CAR_STATUS.put('owner_location', JSON.stringify({
+    const locationTask = ownerLocation
+      ? MOVE_CAR_STATUS.put('owner_location', JSON.stringify({
         lat: ownerLocation.lat,
         lng: ownerLocation.lng,
-        ...urls,
+        ...generateMapUrls(ownerLocation.lat, ownerLocation.lng),
         timestamp: Date.now()
-      }), { expirationTtl: CONFIG.KV_TTL });
-    } else {
-      await MOVE_CAR_STATUS.delete('owner_location');
-    }
-    if (ownerMessage) {
-      await MOVE_CAR_STATUS.put('owner_message', ownerMessage, { expirationTtl: CONFIG.KV_TTL });
-    } else {
-      await MOVE_CAR_STATUS.delete('owner_message');
-    }
+      }), { expirationTtl: CONFIG.KV_TTL })
+      : MOVE_CAR_STATUS.delete('owner_location');
 
-    await MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-    await MOVE_CAR_STATUS.put('session_status', 'arriving', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-    await MOVE_CAR_STATUS.put('notify_status', 'arriving', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const messageTask = ownerMessage
+      ? MOVE_CAR_STATUS.put('owner_message', ownerMessage, { expirationTtl: CONFIG.KV_TTL })
+      : MOVE_CAR_STATUS.delete('owner_message');
+
+    const expiresAt = String(Date.now() + SESSION_VIEW_TTL_SECONDS * 1000);
+    await Promise.all([
+      locationTask,
+      messageTask,
+      MOVE_CAR_STATUS.put('session_id', sessionId, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+      MOVE_CAR_STATUS.put('session_status', 'arriving', { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+      MOVE_CAR_STATUS.put('notify_status', 'arriving', { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+      MOVE_CAR_STATUS.put('session_expires_at', expiresAt, { expirationTtl: SESSION_VIEW_TTL_SECONDS }),
+      MOVE_CAR_STATUS.delete('session_completed_at')
+    ]);
+
+    return jsonResponse({ success: true });
   } catch (error) {
-    // 即使出错也尝试设为确认，避免卡死
-    if (typeof MOVE_CAR_STATUS !== 'undefined') {
-      await MOVE_CAR_STATUS.put('notify_status', 'arriving', { expirationTtl: SESSION_VIEW_TTL_SECONDS });
-    }
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('Owner confirm error:', error);
+    return jsonResponse({ success: false, error: 'OWNER_CONFIRM_FAILED' }, 500);
   }
 }
 
 async function handleClearOwnerLocation(request) {
   try {
-    if (typeof MOVE_CAR_STATUS === 'undefined') return new Response(JSON.stringify({ error: 'KV_NOT_BOUND' }), { status: 500 });
+    if (typeof MOVE_CAR_STATUS === 'undefined') return jsonResponse({ error: 'KV_NOT_BOUND' }, 500);
     const sessionId = await resolveSessionFromRequest(request);
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: 'SESSION_INVALID' }), { status: 404 });
+      return jsonResponse({ error: 'SESSION_INVALID' }, 404);
     }
     await MOVE_CAR_STATUS.delete('owner_location');
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: true });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ success: false }, 500);
   }
 }
 
@@ -823,7 +904,7 @@ async function renderOwnerHomePage(origin, apiBase) {
   </body>
   </html>
   `;
-  return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  return htmlResponse(html);
 }
 
 function renderSessionNotFoundPage() {
@@ -845,7 +926,7 @@ function renderSessionNotFoundPage() {
   </body>
   </html>
   `;
-  return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  return htmlResponse(html);
 }
 
 function renderMainPage(origin, apiBase, sessionPathId) {
@@ -2151,7 +2232,7 @@ function renderMainPage(origin, apiBase, sessionPathId) {
       </div>
       <div
         style="position: fixed; bottom: 10px; right: 10px; opacity: 0.35; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none;">
-        v2.6.1.beta1</div>
+        v2.7.0.beta1</div>
       <div class="card loc-card">
         <div id="locIcon" class="loc-icon loading">📍</div>
         <div class="loc-content">
@@ -2230,6 +2311,7 @@ const SESSION_VIEW_TTL_MS = ${SESSION_VIEW_TTL_SECONDS * 1000};
 const PLATE_VERIFY_RULE = ${JSON.stringify(plateVerifyRule)};
 let userLocation = null;
       let checkTimer = null;
+      let pollInFlight = false;
       let delayTimer = null;
       let retryCooldownTimer = null;
       let phoneCooldownTimer = null;
@@ -2249,6 +2331,27 @@ let userLocation = null;
       let pendingPlateProofForDelay = null;
       let lastPlateProof = null;
       let plateVerifyResolver = null;
+      let locationRequestSeq = 0;
+      const CLIENT_CN_PLATE_PROVINCES = new Set(Array.from('京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领警学港澳'));
+      const CLIENT_CN_PLATE_REGION_RE = /^[A-HJ-NP-Z]$/;
+      const CLIENT_CN_PLATE_SUFFIX_RE = /^[A-HJ-NP-Z0-9]{5,6}$/;
+
+      function normalizePlateValue(value) {
+        return String(value || '').trim().toUpperCase().replace(/[\\s\\-_.·]/g, '');
+      }
+      function validateChinaPlateValue(rawPlate) {
+        const plate = normalizePlateValue(rawPlate);
+        if (plate.length < 7 || plate.length > 8) return { ok: false };
+        const chars = Array.from(plate);
+        const province = chars[0];
+        const region = chars[1] || '';
+        const suffix = chars.slice(2).join('');
+        if (!CLIENT_CN_PLATE_PROVINCES.has(province)) return { ok: false };
+        if (!CLIENT_CN_PLATE_REGION_RE.test(region)) return { ok: false };
+        if (!CLIENT_CN_PLATE_SUFFIX_RE.test(suffix)) return { ok: false };
+        if (!/\\d/.test(suffix)) return { ok: false };
+        return { ok: true, plate };
+      }
 
       // WGS-84 to GCJ-02 function used in client side for map display
       function wgs84ToGcj02Client(lat, lng) {
@@ -2301,6 +2404,12 @@ let userLocation = null;
         if (sessionCard) {
           sessionCard.addEventListener('click', () => resumeSession());
         }
+        window.addEventListener('beforeunload', () => {
+          stopPolling();
+          if (delayTimer) clearInterval(delayTimer);
+          if (retryCooldownTimer) clearInterval(retryCooldownTimer);
+          if (phoneCooldownTimer) clearInterval(phoneCooldownTimer);
+        });
       };
       let idleKick = null;
       function setupPowerMode() {
@@ -2489,6 +2598,7 @@ let userLocation = null;
           }
           setActionHint('会话已完成，需重新发起通知');
         } else if (data.status === 'closed') {
+          stopPolling();
           if (ownerCard) ownerCard.classList.add('hidden');
           if (ownerMsg) ownerMsg.style.display = 'none';
           const waitingCard = document.getElementById('waitingCard');
@@ -2639,7 +2749,10 @@ let userLocation = null;
         const plain = String(raw).replace(/[\\s\\-_.·]/g, '');
         if (!plain) return '';
         if (index === 0) {
-          return Array.from(plain)[0] || '';
+          for (const ch of Array.from(plain)) {
+            if (CLIENT_CN_PLATE_PROVINCES.has(ch)) return ch;
+          }
+          return '';
         }
         const upper = plain.toUpperCase();
         for (const ch of Array.from(upper)) {
@@ -2747,17 +2860,31 @@ let userLocation = null;
         inputs.forEach((input) => {
           const index = Number(input.dataset.proofIndex || 0);
           const orderedInputs = getPlateProofInputs();
+          const applyInputValue = () => {
+            input.value = sanitizeProofChar(index, input.value);
+            if (input.value) focusNextProofInput(index + 1);
+            clearPlateProofInvalid();
+            setPlateVerifyError('');
+          };
           input.autocomplete = 'off';
           input.autocapitalize = 'characters';
           input.spellcheck = false;
           input.addEventListener('focus', () => {
             setTimeout(() => input.select(), 0);
           });
+          input.addEventListener('compositionstart', () => {
+            input.dataset.composing = '1';
+          });
+          input.addEventListener('compositionend', () => {
+            input.dataset.composing = '0';
+            applyInputValue();
+          });
+          input.addEventListener('blur', () => {
+            input.dataset.composing = '0';
+          });
           input.addEventListener('input', () => {
-            input.value = sanitizeProofChar(index, input.value);
-            if (input.value) focusNextProofInput(index + 1);
-            clearPlateProofInvalid();
-            setPlateVerifyError('');
+            if (input.dataset.composing === '1') return;
+            applyInputValue();
           });
           input.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft') {
@@ -2798,6 +2925,7 @@ let userLocation = null;
       function requestLocation() {
         const toggle = document.getElementById('shareLocationToggle');
         if (!toggle.checked) return;
+        const reqSeq = ++locationRequestSeq;
         const icon = document.getElementById('locIcon');
         const txt = document.getElementById('locStatus');
         icon.className = 'loc-icon loading';
@@ -2806,15 +2934,17 @@ let userLocation = null;
         if ('geolocation' in navigator) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
+              if (reqSeq !== locationRequestSeq || !toggle.checked) return;
               userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-              icon.className = 'loc-icon success';
-              txt.className = 'loc-status success';
+              icon.className = 'loc-icon ready';
+              txt.className = 'loc-status';
               txt.innerText = '已获取位置 ✓';
               showMap(userLocation.lat, userLocation.lng);
             },
             (err) => {
+              if (reqSeq !== locationRequestSeq || !toggle.checked) return;
               icon.className = 'loc-icon error';
-              txt.className = 'loc-status error';
+              txt.className = 'loc-status';
               txt.innerText = '位置获取失败，刷新页面可重试';
               hideMap();
             },
@@ -2848,7 +2978,7 @@ let userLocation = null;
             boxZoom: false
           }).setView(center, 16);
           
-          L.tileLayer('http://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+          L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
             subdomains: ['1', '2', '3', '4'],
             minZoom: 1,
             maxZoom: 19
@@ -2885,6 +3015,7 @@ let userLocation = null;
         }
       }
       function disableLocationSharing() {
+        locationRequestSeq++;
         userLocation = null;
         const icon = document.getElementById('locIcon');
         const txt = document.getElementById('locStatus');
@@ -2909,6 +3040,7 @@ let userLocation = null;
         return res;
       }
       function startDelayCountdown(plateProof) {
+        if (delayTimer) clearInterval(delayTimer);
         showModal('delayModal');
         pendingPlateProofForDelay = plateProof;
         countdownVal = 30;
@@ -2919,6 +3051,7 @@ let userLocation = null;
           updateDelayMsg();
           if (countdownVal <= 0) {
              clearInterval(delayTimer);
+             delayTimer = null;
              hideModal('delayModal');
              doSendNotify(null, pendingPlateProofForDelay);
              pendingPlateProofForDelay = null;
@@ -3022,7 +3155,8 @@ let userLocation = null;
       }
 
       function cancelDelay() {
-        clearInterval(delayTimer);
+        if (delayTimer) clearInterval(delayTimer);
+        delayTimer = null;
         pendingPlateProofForDelay = null;
         hideModal('delayModal');
       }
@@ -3066,10 +3200,13 @@ let userLocation = null;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg, plateProof: proof, location: locationToSend, delayed: delayed })
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (res.ok && data.success) {
             if (delayed) showToast('⏳ 通知将延迟30秒发送'); // Should basically never happen with forced false
             else showToast('✅ 发送成功！');
+            if (data.partialFailure) {
+              showToast('⚠️ 部分通道发送失败，请检查通知服务');
+            }
             if (proof) lastPlateProof = proof;
             if (data.localMeowRequest) {
               sendMeowLocal(data.localMeowRequest).catch((err) => {
@@ -3105,11 +3242,21 @@ let userLocation = null;
       }
       document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+      function stopPolling() {
+        if (checkTimer) {
+          clearInterval(checkTimer);
+          checkTimer = null;
+        }
+        pollInFlight = false;
+      }
       function startPolling() {
+        stopPolling();
         let count = 0;
         checkTimer = setInterval(async () => {
+          if (pollInFlight) return;
           count++;
-          if (count > 120) { clearInterval(checkTimer); return; }
+          if (count > 120) { stopPolling(); return; }
+          pollInFlight = true;
           try {
             const res = await fetch(API_BASE + '/check-status');
             const data = await res.json();
@@ -3123,9 +3270,12 @@ let userLocation = null;
               }
               if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
             } else if (data.status === 'closed') {
-              clearInterval(checkTimer);
+              stopPolling();
             }
-          } catch(e) {}
+          } catch(e) {
+          } finally {
+            pollInFlight = false;
+          }
         }, 3000);
       }
       function showToast(text) {
@@ -3153,7 +3303,7 @@ let userLocation = null;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: '再次通知：请尽快挪车', plateProof: PLATE_VERIFY_RULE.enabled ? lastPlateProof : null, location: userLocation, sessionId: currentSessionId })
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (res.ok && data.success) {
             if (data.localMeowRequest) {
               sendMeowLocal(data.localMeowRequest).catch((err) => {
@@ -3162,12 +3312,15 @@ let userLocation = null;
               });
             }
             showToast('✅ 再次通知已发送！');
+            if (data.partialFailure) {
+              showToast('⚠️ 部分通道发送失败，请检查通知服务');
+            }
             document.getElementById('waitingText').innerText = '已再次通知，等待车主回应...';
             startRetryCooldown(retryCooldownSeconds);
             startPhoneCooldown(callCooldownSeconds);
             success = true;
-          } else { throw new Error('API Error'); }
-        } catch (e) { showToast('❌ 发送失败，请重试'); }
+          } else { throw new Error(data.error || 'API Error'); }
+        } catch (e) { showToast('❌ 发送失败：' + (e && e.message ? e.message : '请重试')); }
         if (!success) {
           btn.disabled = false;
           btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
@@ -3407,11 +3560,11 @@ let userLocation = null;
 
 </html>
   `;
-  const headers = { 'Content-Type': 'text/html;charset=UTF-8' };
+  const headers = {};
   if (sessionPathId) {
-    headers['Set-Cookie'] = `mc_session=${sessionPathId}; Max-Age=${SESSION_VIEW_TTL_SECONDS}; Path=/; SameSite=Lax`;
+    headers['Set-Cookie'] = buildSessionCookie(sessionPathId);
   }
-  return new Response(html, { headers });
+  return htmlResponse(html, 200, headers);
 }
 
 function renderOwnerPage(sessionToken, sessionId, apiBase) {
@@ -4184,6 +4337,78 @@ const API_BASE = '${apiBase}';
 const SESSION_TOKEN = '${sessionToken}';
 const SESSION_ID = '${sessionId}';
 let ownerLocation = null;
+      let ownerLocationRequestSeq = 0;
+      let ownerSessionPollTimer = null;
+      let ownerSessionEnded = false;
+      function showOwnerMsg(text, timeoutMs = 2000) {
+        const msg = document.getElementById('clearMsg');
+        if (!msg) return;
+        msg.innerText = text || '';
+        if (timeoutMs > 0) {
+          setTimeout(() => {
+            if (msg.innerText === text) msg.innerText = '';
+          }, timeoutMs);
+        }
+      }
+      function applyOwnerArrivingState() {
+        if (ownerSessionEnded) return;
+        const btn = document.getElementById('confirmBtn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>✅</span><span>已确认</span>';
+          btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+        }
+        const doneMsg = document.getElementById('doneMsg');
+        if (doneMsg) doneMsg.classList.add('show');
+      }
+      function applyOwnerClosedState(message) {
+        ownerSessionEnded = true;
+        const btn = document.getElementById('confirmBtn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>✅</span><span>会话已结束</span>';
+          btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+        }
+        const endBtn = document.getElementById('endSessionBtn');
+        if (endBtn) endBtn.style.display = 'none';
+        const clearBtn = document.getElementById('clearLocBtn');
+        if (clearBtn) clearBtn.disabled = true;
+        const toggle = document.getElementById('shareLocationToggle');
+        if (toggle) toggle.disabled = true;
+        if (message) showOwnerMsg(message, 2500);
+        if (ownerSessionPollTimer) {
+          clearInterval(ownerSessionPollTimer);
+          ownerSessionPollTimer = null;
+        }
+      }
+      function applyOwnerSessionStatus(status) {
+        if (status === 'closed') {
+          applyOwnerClosedState('会话已结束');
+          return;
+        }
+        if (status === 'arriving') {
+          applyOwnerArrivingState();
+        }
+      }
+      async function syncOwnerSessionStatus() {
+        try {
+          const res = await fetch(API_BASE + '/get-session?role=owner&session=' + encodeURIComponent(SESSION_TOKEN));
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          if (!data) return;
+          if (!data.sessionId || data.sessionStatus === 'closed') {
+            applyOwnerClosedState('会话已结束');
+            return;
+          }
+          applyOwnerSessionStatus(data.sessionStatus);
+        } catch (e) {}
+      }
+      function startOwnerSessionPolling() {
+        if (ownerSessionPollTimer) clearInterval(ownerSessionPollTimer);
+        ownerSessionPollTimer = setInterval(() => {
+          if (!ownerSessionEnded) syncOwnerSessionStatus();
+        }, 4000);
+      }
       window.onload = async () => {
         try {
           const sessionInfo = document.getElementById('sessionInfo');
@@ -4202,7 +4427,19 @@ let ownerLocation = null;
               document.getElementById('appleLink').href = data.appleUrl;
             }
           }
-          await fetch(API_BASE + '/get-session?role=owner&session=' + encodeURIComponent(SESSION_TOKEN));
+          const sessionRes = await fetch(API_BASE + '/get-session?role=owner&session=' + encodeURIComponent(SESSION_TOKEN));
+          const sessionData = await sessionRes.json().catch(() => null);
+          if (sessionData) {
+            if (!sessionData.sessionId || sessionData.sessionStatus === 'closed') {
+              applyOwnerClosedState('会话已结束');
+            } else {
+              applyOwnerSessionStatus(sessionData.sessionStatus);
+            }
+          }
+          startOwnerSessionPolling();
+          window.addEventListener('beforeunload', () => {
+            if (ownerSessionPollTimer) clearInterval(ownerSessionPollTimer);
+          });
         } catch(e) {}
       }
       let idleKick = null;
@@ -4259,8 +4496,13 @@ let ownerLocation = null;
         return input.value.trim().slice(0, 120);
       }
       async function confirmMove() {
+        if (ownerSessionEnded) {
+          showOwnerMsg('会话已结束，无法确认', 2500);
+          return;
+        }
         const btn = document.getElementById('confirmBtn');
-        const shareLocation = document.getElementById('shareLocationToggle').checked;
+        const toggle = document.getElementById('shareLocationToggle');
+        const shareLocation = !!(toggle && toggle.checked);
         const ownerMessage = getOwnerMessage();
         
         btn.disabled = true;
@@ -4268,63 +4510,77 @@ let ownerLocation = null;
         if (shareLocation) {
              btn.innerHTML = '<span>📍</span><span>获取位置中...</span>';
              if ('geolocation' in navigator) {
+               const reqSeq = ++ownerLocationRequestSeq;
                navigator.geolocation.getCurrentPosition(
-                 async (pos) => { ownerLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; await doConfirm(ownerMessage); },
-                 async (err) => { ownerLocation = null; await doConfirm(ownerMessage); },
+                 async (pos) => {
+                   if (reqSeq !== ownerLocationRequestSeq) return;
+                   ownerLocation = (toggle && !toggle.checked)
+                     ? null
+                     : { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                   await doConfirm(ownerMessage);
+                 },
+                 async (err) => {
+                   if (reqSeq !== ownerLocationRequestSeq) return;
+                   ownerLocation = null;
+                   await doConfirm(ownerMessage);
+                 },
                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                );
              } else { ownerLocation = null; await doConfirm(ownerMessage); }
         } else {
+            ownerLocationRequestSeq++;
             ownerLocation = null;
             await doConfirm(ownerMessage);
         }
       }
       async function clearOwnerLocation() {
-        const msg = document.getElementById('clearMsg');
+        if (ownerSessionEnded) {
+          showOwnerMsg('会话已结束');
+          return;
+        }
         try {
           const res = await fetch(API_BASE + '/clear-owner-location?session=' + encodeURIComponent(SESSION_TOKEN), { method: 'POST' });
           if (!res.ok) throw new Error('CLEAR_FAILED');
-          if (msg) msg.innerText = '已清除位置';
+          showOwnerMsg('已清除位置');
         } catch (e) {
-          if (msg) msg.innerText = '清除失败，请重试';
-        }
-        if (msg) {
-          setTimeout(() => { msg.innerText = ''; }, 2000);
+          showOwnerMsg('清除失败，请重试');
         }
       }
       async function terminateSession() {
-        const msg = document.getElementById('clearMsg');
+        if (ownerSessionEnded) {
+          showOwnerMsg('会话已结束');
+          return;
+        }
         try {
           const res = await fetch(API_BASE + '/terminate-session?session=' + encodeURIComponent(SESSION_TOKEN), { method: 'POST' });
           if (!res.ok) throw new Error('TERMINATE_FAILED');
-          if (msg) msg.innerText = '会话已终止';
-          const endBtn = document.getElementById('endSessionBtn');
-          if (endBtn) endBtn.style.display = 'none';
+          applyOwnerClosedState('会话已终止');
         } catch (e) {
-          if (msg) msg.innerText = '终止失败，请重试';
-        }
-        if (msg) {
-          setTimeout(() => { msg.innerText = ''; }, 2000);
+          showOwnerMsg('终止失败，请重试');
         }
       }
       async function doConfirm(ownerMessage) {
         const btn = document.getElementById('confirmBtn');
         btn.innerHTML = '<span>⏳</span><span>确认中...</span>';
         try {
-          await fetch(API_BASE + '/owner-confirm?session=' + encodeURIComponent(SESSION_TOKEN), {
+          const res = await fetch(API_BASE + '/owner-confirm?session=' + encodeURIComponent(SESSION_TOKEN), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ location: ownerLocation, message: ownerMessage || '' })
           });
-          if (btn) {
-              btn.innerHTML = '<span>✅</span><span>已确认</span>';
-              btn.style.background = 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)';
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'OWNER_CONFIRM_FAILED');
           }
-          const doneMsg = document.getElementById('doneMsg');
-          if (doneMsg) doneMsg.classList.add('show');
+          applyOwnerArrivingState();
         } catch(e) {
+          if (String(e && e.message || '') === 'SESSION_CLOSED') {
+            applyOwnerClosedState('会话已结束');
+            return;
+          }
           btn.disabled = false;
           btn.innerHTML = '<span>🚀</span><span>我已知晓，正在前往</span>';
+          showOwnerMsg('确认失败，请重试');
         }
       }
 
@@ -4560,5 +4816,5 @@ let ownerLocation = null;
 
 </html>
   `;
-  return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  return htmlResponse(html);
 }
