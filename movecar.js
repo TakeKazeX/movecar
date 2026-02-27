@@ -2335,6 +2335,8 @@ let userLocation = null;
       const CLIENT_CN_PLATE_PROVINCES = new Set(Array.from('京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领警学港澳'));
       const CLIENT_CN_PLATE_REGION_RE = /^[A-HJ-NP-Z]$/;
       const CLIENT_CN_PLATE_SUFFIX_RE = /^[A-HJ-NP-Z0-9]{5,6}$/;
+      const SESSION_PROOF_KEY_PREFIX = 'mc_plate_proof_';
+      const SESSION_RETRY_KEY_PREFIX = 'mc_retry_ready_';
 
       function normalizePlateValue(value) {
         return String(value || '').trim().toUpperCase().replace(/[\\s\\-_.·]/g, '');
@@ -2351,6 +2353,122 @@ let userLocation = null;
         if (!CLIENT_CN_PLATE_SUFFIX_RE.test(suffix)) return { ok: false };
         if (!/\\d/.test(suffix)) return { ok: false };
         return { ok: true, plate };
+      }
+      function safeSessionStorageGet(key) {
+        try {
+          return sessionStorage.getItem(key);
+        } catch (e) {
+          return null;
+        }
+      }
+      function safeSessionStorageSet(key, value) {
+        try {
+          sessionStorage.setItem(key, value);
+        } catch (e) {}
+      }
+      function safeSessionStorageRemove(key) {
+        try {
+          sessionStorage.removeItem(key);
+        } catch (e) {}
+      }
+      function getPlateProofStorageKey(sessionId) {
+        if (!sessionId) return null;
+        return SESSION_PROOF_KEY_PREFIX + sessionId;
+      }
+      function getRetryReadyStorageKey(sessionId) {
+        if (!sessionId) return null;
+        return SESSION_RETRY_KEY_PREFIX + sessionId;
+      }
+      function loadStoredPlateProof(sessionId) {
+        if (!PLATE_VERIFY_RULE.enabled) return null;
+        const key = getPlateProofStorageKey(sessionId);
+        if (!key) return null;
+        const raw = safeSessionStorageGet(key);
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') return null;
+          const normalized = normalizePlateValue(parsed.plate || '');
+          if (!normalized || normalized !== PLATE_VERIFY_RULE.plate) return null;
+          const valid = validateChinaPlateValue(normalized);
+          if (!valid.ok) return null;
+          return { plate: normalized };
+        } catch (e) {
+          return null;
+        }
+      }
+      function persistPlateProof(sessionId, proof) {
+        if (!PLATE_VERIFY_RULE.enabled || !proof || typeof proof !== 'object') return;
+        const key = getPlateProofStorageKey(sessionId);
+        if (!key) return;
+        const normalized = normalizePlateValue(proof.plate || '');
+        if (!normalized || normalized !== PLATE_VERIFY_RULE.plate) return;
+        safeSessionStorageSet(key, JSON.stringify({ plate: normalized }));
+      }
+      function clearStoredSessionClientState(sessionId) {
+        const proofKey = getPlateProofStorageKey(sessionId);
+        const retryKey = getRetryReadyStorageKey(sessionId);
+        if (proofKey) safeSessionStorageRemove(proofKey);
+        if (retryKey) safeSessionStorageRemove(retryKey);
+      }
+      function setRetryReadyAtTimestamp(timestamp, persist) {
+        const nextTs = Number(timestamp);
+        retryReadyAt = Number.isFinite(nextTs) ? nextTs : 0;
+        if (retryCooldownTimer) {
+          clearInterval(retryCooldownTimer);
+          retryCooldownTimer = null;
+        }
+        if (persist && currentSessionId) {
+          const retryKey = getRetryReadyStorageKey(currentSessionId);
+          if (retryKey) {
+            if (retryReadyAt > Date.now()) safeSessionStorageSet(retryKey, String(retryReadyAt));
+            else safeSessionStorageRemove(retryKey);
+          }
+        }
+        if (retryReadyAt > Date.now()) {
+          updateRetryCountdown();
+          retryCooldownTimer = setInterval(updateRetryCountdown, 1000);
+        } else {
+          retryReadyAt = 0;
+          const btn = document.getElementById('retryBtn');
+          if (btn && !btn.innerText.includes('会话已')) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
+          }
+          updateActionHint();
+        }
+      }
+      function restoreSessionClientState(sessionId, sessionStatus) {
+        if (!sessionId) {
+          lastPlateProof = null;
+          setRetryReadyAtTimestamp(0, false);
+          return;
+        }
+        if (sessionStatus === 'closed' || sessionStatus === 'confirmed') {
+          clearStoredSessionClientState(sessionId);
+          lastPlateProof = null;
+          setRetryReadyAtTimestamp(0, false);
+          return;
+        }
+        if (PLATE_VERIFY_RULE.enabled) {
+          const storedProof = loadStoredPlateProof(sessionId);
+          if (storedProof) lastPlateProof = storedProof;
+        } else {
+          lastPlateProof = null;
+        }
+        const retryKey = getRetryReadyStorageKey(sessionId);
+        const retryRaw = retryKey ? safeSessionStorageGet(retryKey) : null;
+        const retryTs = retryRaw ? Number(retryRaw) : 0;
+        if (Number.isFinite(retryTs) && retryTs > Date.now()) {
+          if (Math.abs(retryTs - retryReadyAt) > 500) {
+            setRetryReadyAtTimestamp(retryTs, false);
+          } else {
+            updateRetryCountdown();
+          }
+        } else {
+          if (retryKey) safeSessionStorageRemove(retryKey);
+          setRetryReadyAtTimestamp(0, false);
+        }
       }
 
       // WGS-84 to GCJ-02 function used in client side for map display
@@ -2488,6 +2606,7 @@ let userLocation = null;
         return '销毁时间 ' + time;
       }
       function applySessionInfo(data) {
+        const previousSessionId = currentSessionId;
         const info = document.getElementById('sessionInfoUser');
         const code = document.getElementById('sessionCodeUser');
         const status = document.getElementById('sessionStatusUser');
@@ -2495,6 +2614,11 @@ let userLocation = null;
         currentSessionId = data && data.sessionId ? data.sessionId : null;
         currentSessionStatus = data && data.sessionStatus ? data.sessionStatus : null;
         currentSessionCompletedAt = data && data.sessionCompletedAt ? Number(data.sessionCompletedAt) : null;
+        if (previousSessionId && previousSessionId !== currentSessionId) {
+          lastPlateProof = null;
+          setRetryReadyAtTimestamp(0, false);
+        }
+        restoreSessionClientState(currentSessionId, currentSessionStatus);
         if (currentSessionId) {
           if (code) code.innerText = '#' + currentSessionId;
           if (status) status.innerText = formatSessionStatus(currentSessionStatus);
@@ -2651,13 +2775,7 @@ let userLocation = null;
         setActionHint('车主没反应？试试其他方式');
       }
       function startRetryCooldown(seconds) {
-        const btn = document.getElementById('retryBtn');
-        if (!btn) return;
-        if (retryCooldownTimer) clearInterval(retryCooldownTimer);
-        retryReadyAt = Date.now() + seconds * 1000;
-        btn.disabled = true;
-        updateRetryCountdown();
-        retryCooldownTimer = setInterval(updateRetryCountdown, 1000);
+        setRetryReadyAtTimestamp(Date.now() + seconds * 1000, true);
       }
       function updateRetryCountdown() {
         const btn = document.getElementById('retryBtn');
@@ -2666,6 +2784,11 @@ let userLocation = null;
         if (remaining <= 0) {
           clearInterval(retryCooldownTimer);
           retryCooldownTimer = null;
+          retryReadyAt = 0;
+          if (currentSessionId) {
+            const retryKey = getRetryReadyStorageKey(currentSessionId);
+            if (retryKey) safeSessionStorageRemove(retryKey);
+          }
           btn.disabled = false;
           btn.innerHTML = '<span>🔔</span><span>再次通知</span>';
           updateActionHint();
@@ -3222,6 +3345,7 @@ let userLocation = null;
               applySessionInfo({ sessionId: data.sessionId, sessionStatus: 'active', sessionCompletedAt: null });
               history.replaceState(null, '', '/' + data.sessionId);
             }
+            if (proof) persistPlateProof(data.sessionId || currentSessionId, proof);
             ownerConfirmed = false;
             retryCooldownSeconds = 30;
             callCooldownSeconds = 30;
@@ -3290,9 +3414,18 @@ let userLocation = null;
           showToast('⏳ 请等待倒计时结束再提醒');
           return;
         }
-        if (PLATE_VERIFY_RULE.enabled && !lastPlateProof) {
-          showToast('❌ 首次通知未完成车牌验证，请重新发起');
-          return;
+        let proofForRetry = lastPlateProof;
+        if (PLATE_VERIFY_RULE.enabled && !proofForRetry) {
+          proofForRetry = loadStoredPlateProof(currentSessionId);
+          if (proofForRetry) {
+            lastPlateProof = proofForRetry;
+          }
+        }
+        if (PLATE_VERIFY_RULE.enabled && !proofForRetry) {
+          proofForRetry = await requestPlateVerify();
+          if (!proofForRetry) return;
+          lastPlateProof = proofForRetry;
+          persistPlateProof(currentSessionId, proofForRetry);
         }
         let success = false;
         btn.disabled = true;
@@ -3301,10 +3434,14 @@ let userLocation = null;
           const res = await fetch(API_BASE + '/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '再次通知：请尽快挪车', plateProof: PLATE_VERIFY_RULE.enabled ? lastPlateProof : null, location: userLocation, sessionId: currentSessionId })
+            body: JSON.stringify({ message: '再次通知：请尽快挪车', plateProof: PLATE_VERIFY_RULE.enabled ? proofForRetry : null, location: userLocation, sessionId: currentSessionId })
           });
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.success) {
+            if (PLATE_VERIFY_RULE.enabled && proofForRetry) {
+              lastPlateProof = proofForRetry;
+              persistPlateProof(data.sessionId || currentSessionId, proofForRetry);
+            }
             if (data.localMeowRequest) {
               sendMeowLocal(data.localMeowRequest).catch((err) => {
                 console.error(err);
